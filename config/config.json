@@ -1,0 +1,17 @@
+{
+    "weights": "weights/model.onnx",
+    "device": "cpu",
+    "imgsz": [
+        640,
+        640
+    ],
+    "confidence_threshold": 25,
+    "iou_threshold": 25,
+    "use_agnostic_nms": false,
+    "enable_augmentation": false,
+    "hide_labels_enabled": false,
+    "hide_confidence_enabled": false,
+    "line_thickness_value": 2,
+    "video_stride": 1,
+    "max_detection_count": 1000
+}
