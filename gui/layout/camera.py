@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, Slot
-from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QFrame, QMainWindow, QWidget
+from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QFrame, QWidget
 from PySide6.QtGui import QPixmap, QImage
 
 from threads.camera import CameraThread
@@ -9,7 +9,9 @@ class InactiveThreadError(Exception):
     def __init__(self, message):
         super().__init__("Thread error:", message)
 
+
 ThreadInactiveError = InactiveThreadError("Thread is not running")
+
 
 class CameraLayout(QWidget):
     X = 250
@@ -17,26 +19,45 @@ class CameraLayout(QWidget):
     WIDTH = 640
     HEIGHT = 640
 
-    def __init__(self, parent: QMainWindow = None):
-        super().__init__()
-        self.parent = parent
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.parent: QWidget = parent
         self.ct = None
 
-        self.frame = QFrame()
-        self.frame.setGeometry(self.X, self.Y, self.WIDTH, self.HEIGHT)
+        self.setup_ui()
 
-        self.groupbox = QGroupBox()
-        self.groupbox.setTitle("Camera")
-        self.groupbox.setFixedSize(self.WIDTH, self.HEIGHT)
+    def setup_ui(self):
+        self.frame = self.create_frame()
+        self.groupbox = self.create_groupbox()
+        self.vbox = self.create_vbox()
+        self.video = self.create_video()
 
-        self.vbox = QVBoxLayout(self.groupbox)
-        self.vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.arrange_ui()
 
-        self.video = QLabel(self.groupbox)
-        self.video.setText("No Camera Detected")
-        self.video.setFixedSize(self.WIDTH, self.HEIGHT)
-        self.video.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    def create_frame(self):
+        frame = QFrame(self)
+        frame.setGeometry(self.X, self.Y, self.WIDTH, self.HEIGHT)
+        return frame
 
+    def create_groupbox(self):
+        groupbox = QGroupBox(self.frame)
+        groupbox.setTitle("Camera")
+        groupbox.setFixedSize(self.WIDTH, self.HEIGHT)
+        return groupbox
+
+    def create_vbox(self):
+        vbox = QVBoxLayout(self.groupbox)
+        vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        return vbox
+
+    def create_video(self):
+        video = QLabel(self.groupbox)
+        video.setText("No Camera Detected")
+        video.setFixedSize(self.WIDTH, self.HEIGHT)
+        video.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        return video
+
+    def arrange_ui(self):
         self.frame.setParent(self.parent)
         self.groupbox.setParent(self.frame)
         self.vbox.setParent(self.groupbox)
@@ -51,45 +72,35 @@ class CameraLayout(QWidget):
         self.ct = CameraThread(self.groupbox)
         self.ct.ImageSignal.connect(self.frame_signal)
 
-    def start(self):
-        self.ct.finished.connect(self.ct.deleteLater)
-        self.ct.start()
-
-    def restart(self):
-        if self.is_running():
-            self.safe_stop()
-        self.start()
-        
-    def stop_without_exit(self):
-        if not self.is_running():
-            raise ThreadInactiveError
-        else:
-            self.ct.stopThread(False, False)
-
-    def safe_stop(self):
-        if not self.is_running():
-            raise ThreadInactiveError
-        else:
-            self.ct.stopThread()
-
-    def unsafe_stop(self):
-        if not self.is_running():
-            raise ThreadInactiveError
-        else:
-            self.ct.stopThread(False)
+    @Slot(QImage)
+    def frame_signal(self, image: QImage):
+        pixmap = QPixmap.fromImage(image)
+        self.video.setPixmap(pixmap)
 
     def is_running(self):
         if self.ct:
             return self.ct.isRunning()
         return False
 
+    def restart(self):
+        if self.is_running():
+            self.safe_stop()
+        else:
+            self.start()
+
     def signal(self):
         if not self.ct:
             raise ThreadInactiveError
         return self.ct.ImageTypeSignal
 
-    @Slot(QImage)
-    def frame_signal(self, image: QImage):
-        pixmap = QPixmap.fromImage(image)
+    def start(self):
+        if self.ct:
+            self.ct.finished.connect(self.ct.deleteLater)
+            self.ct.start()
 
-        self.video.setPixmap(pixmap)
+    def safe_stop(self):
+        if not self.is_running():
+            raise ThreadInactiveError
+        else:
+            if self.ct != None:
+                self.ct.stopThread(True)
