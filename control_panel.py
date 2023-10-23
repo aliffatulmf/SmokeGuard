@@ -38,8 +38,19 @@ def fetch_requirements() -> list:
         sys.exit(1)
 
     url: str = "https://raw.githubusercontent.com/ultralytics/yolov5/master/requirements.txt"
-    response = requests.get(url)
-    requirements: list = [line.strip() for line in response.text.split("\n") if line and not line.startswith("#")]
+    try:
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as err:
+        print(f"Error occurred: {err}")
+        sys.exit(1)
+
+    try:
+        requirements: list = [line.strip() for line in response.text.split("\n") if line and not line.startswith("#")]
+    except Exception as err:
+        print(f"Error occurred while parsing the response: {err}")
+        sys.exit(1)
+
     return requirements
 
 def install_dependencies() -> None:
