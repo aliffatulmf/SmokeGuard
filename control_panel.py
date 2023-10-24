@@ -62,19 +62,53 @@ class Dependency:
 
         return requirements
 
-    def remove_version(self, dependency):
-        operators = [">=", "<=", "==", "<", ">"]
+    def remove_version(self, dependency: str) -> str:
+        # Define the list of operators
+        operators: list[str] = [">=", "<=", "==", "<", ">"]
+
+        # Check for each operator in the dependency
         for operator in operators:
             if operator in dependency:
-                return dependency.split(operator)[0].strip()
+                # Split the dependency on the operator and keep the first part
+                # For example, if dependency is "numpy>=1.18.5", dep will be "numpy"
+                dep: str = dependency.split(operator)[0]
+
+                return self.remove_inline_comments(dep)
+
+        # If no operator found, return the dependency
+        # For example, if dependency is "numpy", it will return "numpy"
         return dependency.strip()
 
-    def install(self, latest: bool) -> None:
+    def remove_inline_comments(self, dependency: str) -> str:
+        if "#" in dependency:
+            # For example, if dependency is "numpy # numpy is a dependency", dep will be "numpy"
+            dep = dependency.split("#")[0]
+
+            return dep.strip()
+
+        # If no inline comment found, return the dependency
+        # For example, if dependency is "numpy", it will return "numpy"
+        return dependency.strip()
+
+    def install(self, latest: bool = False, reinstall: bool = False) -> None:
+        cmd = [sys.executable, "-m", "pip", "install"]
+
+        if reinstall:
+            cmd.append("--force-reinstall")
+
         for dep in self.fetch_requirements():
+            dep = self.remove_inline_comments(dep)
             if latest:
                 dep: str = self.remove_version(dep)
-            print("Installing", dep)
-            subprocess.run([sys.executable, "-m", "pip", "install", dep])
+
+            cmd.append(dep.strip())
+
+        print("Installing dependencies...")
+        try:
+            subprocess.check_call(cmd, stdout=sys.stdout)
+        except subprocess.CalledProcessError as err:
+            print(f"Error occurred while installing dependencies: {err}")
+            sys.exit(1)
 
 
 class Handler:
@@ -124,7 +158,10 @@ class Arguments(argparse.ArgumentParser):
 
 def dependency_handler(**kwargs):
     dependency = Dependency()
-    dependency.install(kwargs["latest"] if "latest" in kwargs else False)
+    dependency.install(
+        kwargs["latest"] if "latest" in kwargs else False,
+        kwargs["reinstall"] if "reinstall" in kwargs else False,
+    )
 
 
 def main():
@@ -133,14 +170,23 @@ def main():
     argument.store_true("-i", "--install-deps", help="Install YOLOv5 dependencies")
     argument.store_true(
         "--latest",
-        help="Install latest dependencies. Only works with --install-deps",
+        help="Install the latest version of the dependencies. Only works with --install-deps",
+    )
+    argument.store_true(
+        "--reinstall",
+        help="Reinstall the dependencies. Only works with --install-deps",
     )
     parsed_arguments = argument.parse_args()
 
     handler_instance = Handler()
     handler_instance.add_handler("clean", remove_cache)
     handler_instance.add_handler(
-        "install_deps", partial(dependency_handler, latest=parsed_arguments.latest)
+        "install_deps",
+        partial(
+            dependency_handler,
+            latest=parsed_arguments.latest,
+            reinstall=parsed_arguments.reinstall,
+        ),
     )
 
     for key, value in vars(parsed_arguments).items():
