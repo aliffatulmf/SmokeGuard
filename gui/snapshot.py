@@ -1,6 +1,8 @@
-from PySide6.QtWidgets import QWidget, QScrollArea, QLabel, QVBoxLayout, QHBoxLayout
+from typing import List
+
 from PySide6.QtCore import Qt, Slot
-from PySide6.QtGui import QPixmap, QImage, QIcon
+from PySide6.QtGui import QFont, QIcon, QImage, QPixmap
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from classtype import ImageType
 
@@ -8,85 +10,134 @@ from classtype import ImageType
 class SnapshotWindow(QWidget):
     def __init__(self) -> None:
         super(SnapshotWindow, self).__init__()
+
+        # Sets the window icon to be the specified image.
         self.setWindowIcon(QIcon("assets/icon/icon.png"))
-        self.scroll_panel = None
-        self.scroll_panel_layout = None
-        self.scroll_area = None
-        self.main_layout = None
-        
-        self.label_list = []
 
-        self.init_ui()
+        # Initialises the scroll panel widget.
+        self.scrollWidget: QWidget = QWidget()
 
-    def init_ui(self):
+        # Initialises the scroll area widget.
+        self.scrollArea: QScrollArea = QScrollArea()
+
+        # Initialises the layout for the scroll panel.
+        self.scrollLayout: QVBoxLayout = QVBoxLayout()
+
+        # Main layout is initially set to None.
+        self.mainLayout = None
+
+        self.label_list: List[tuple[QLabel, QLabel, QLabel]] = []
+        self.initialize_user_interface()
+
+    def initialize_user_interface(self):
         self.setWindowTitle("Snapshot Window")
-        self.setFixedHeight(900)
-        self.setMinimumWidth(600)
-        self.setMaximumWidth(900)
+        self.setFixedHeight(600)
+        self.setMinimumWidth(1000)
+        self.setMaximumWidth(1080)
 
-        self.scroll_panel = QWidget(self)
-        
-        self.scroll_panel_layout = QVBoxLayout(self.scroll_panel)
-        self.scroll_panel_layout.setContentsMargins(30, 30, 0, 0)
+        self.scrollWidget = QWidget(self)
+        self.scrollLayout = QVBoxLayout(self.scrollWidget)
+        self.scrollLayout.setContentsMargins(30, 30, 0, 0)
+        self.scrollWidget.setStyleSheet("background: #ffffff; border-radius: 10px;")
 
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        # Automatically scroll to the bottom of the scroll area when a new image is added
-        self.scroll_area.verticalScrollBar().rangeChanged.connect(self._update_scroll)
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setWidget(self.scroll_panel)
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.scrollArea.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
 
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.addWidget(self.scroll_area)
+        # Disable auto-scroll on the scroll area
+        # self.scrollArea.verticalScrollBar().rangeChanged.connect(
+        #     lambda min, max: self.scrollArea.verticalScrollBar().setValue(max)
+        # )
 
-    def _update_scroll(self, min, max):
-        self.scroll_area.verticalScrollBar().setValue(max)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setWidget(self.scrollWidget)
 
-    def add_image(self, image: ImageType):
+        self.mainLayout = QVBoxLayout(self)
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout.addWidget(self.scrollArea)
+
+    def add_image(self, input_image: ImageType):
+        if self.scrollLayout.count() > 10:
+            self.remove_first_widget()
+            self.remove_first_label_set()
+
+        horizontal_layout = self.create_horizontal_layout()
+        horizontal_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        field_layout = self.create_vertical_layout()
+        field_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+
+        labels_to_add = self.create_labels(input_image)
+        for label in labels_to_add:
+            field_layout.addWidget(label)
+
+        self.label_list.append(labels_to_add)
+
+        image_frame = self.create_frame(input_image.image)
+        horizontal_layout.addWidget(image_frame)
+        horizontal_layout.addLayout(field_layout)
+
+        self.scrollLayout.addLayout(horizontal_layout)
+
+    def create_labels(self, image: ImageType) -> tuple[QLabel, QLabel, QLabel]:
+        font = QFont()
+        font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
+        font.setFamily("Segeo UI")
+        font.setPixelSize(18)
+
+        name_label = QLabel(f"Name:\t\t{image.name}")
+        name_label.setFont(font)
+        name_label.setWordWrap(True)
+
+        conf_label = QLabel(f"Confidence:\t{image.confidence * 100:.2f}%")
+        conf_label.setStyleSheet("font-size: 18px")
+        conf_label.setFont(font)
+        conf_label.setWordWrap(True)
+
+        time_label = QLabel(f"Time:\t\t{image.timestamp}")
+        time_label.setStyleSheet("font-size: 18px")
+        time_label.setFont(font)
+        time_label.setWordWrap(True)
+
+        return (name_label, conf_label, time_label)
+
+    def create_horizontal_layout(self):
         h_layout = QHBoxLayout()
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.setSpacing(0)
-        
+        return h_layout
+
+    def create_vertical_layout(self):
         field_layout = QVBoxLayout()
         field_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         field_layout.setSpacing(5)
-        
-        name_label = QLabel(f"Name:\t\t{image.name}")
-        conf_label = QLabel(f"Confidence:\t{image.confidence}")
-        time_label = QLabel(f"Time:\t\t{image.timestamp}")
-        
-        field_layout.addWidget(name_label)
-        field_layout.addWidget(conf_label)
-        field_layout.addWidget(time_label)
-        
-        self.label_list.append((name_label, conf_label, time_label))
-        
-        pixmap = QPixmap(image.image)
+        return field_layout
+
+    def create_frame(self, image):
+        pixmap = QPixmap(image)
         frame = QLabel()
         frame.setPixmap(pixmap.scaledToHeight(300))
-        
-        h_layout.addWidget(frame)
-        h_layout.addLayout(field_layout)
-        
-        self.scroll_panel_layout.addLayout(h_layout)
-        
-        if self.scroll_panel_layout.count() > 100:
-            scroll_widget = self.scroll_panel_layout.takeAt(0).widget()
-            if scroll_widget:
-                scroll_widget.deleteLater()
-                
-            label_list = self.label_list.pop(0)
-            label_list[0].deleteLater()
-            label_list[1].deleteLater()
-            label_list[2].deleteLater()
+        return frame
+
+    def remove_first_widget(self):
+        first_widget = self.scrollLayout.takeAt(0)
+        widget_to_remove = first_widget.widget()
+        if widget_to_remove is not None:
+            self.scrollLayout.removeWidget(widget_to_remove)
+            widget_to_remove.deleteLater()
+
+    def remove_first_label_set(self):
+        first_label_set = self.label_list.pop(0)
+        field_layout = self.scrollLayout.itemAt(0).layout()
+        for label in first_label_set:
+            field_layout.removeWidget(label)
+            label.deleteLater()
 
     def add_pixmap(self, pixmap: QPixmap):
         label = QLabel()
         label.setPixmap(pixmap.scaled(300, 300))
-
-        self.scroll_panel_layout.addRow(label)
+        self.scrollLayout.addWidget(label)
 
     @Slot(QPixmap)
     def slot_pixmap(self, pixmap: QPixmap):
