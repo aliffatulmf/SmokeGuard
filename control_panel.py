@@ -50,6 +50,11 @@ class Dependency:
             print(f"Error occurred: {err}")
             sys.exit(1)
 
+        requirements: list = self.parse_response(response)
+
+        return requirements
+
+    def parse_response(self, response) -> list:
         try:
             requirements: list = [
                 line.strip()
@@ -147,9 +152,6 @@ class Arguments(argparse.ArgumentParser):
         super().__init__(
             prog="control_panel.py",
             description="Control Panel for YOLOv5",
-            exit_on_error=True,
-            add_help=True,
-            usage="%(prog)s [options]",
         )
 
     def store_true(self, *args, **kwargs):
@@ -164,20 +166,30 @@ def dependency_handler(**kwargs):
     )
 
 
-def main():
+def define_argument_parser():
     argument = Arguments()
-    argument.store_true("-c", "--clean", help="Clean the Python cache folder")
-    argument.store_true("-i", "--install-deps", help="Install YOLOv5 dependencies")
+    argument.store_true(
+        "-c",
+        "--clean",
+        help="Delete all __pycache__ directories in the current directory and its subdirectories",
+    )
+    argument.store_true(
+        "-i",
+        "--install-deps",
+        help="Download and install dependencies listed in the YOLOv5 requirements",
+    )
     argument.store_true(
         "--latest",
-        help="Install the latest version of the dependencies. Only works with --install-deps",
+        help="Install the latest versions of the YOLOv5 dependencies. Should be used along with --install-deps flag",
     )
     argument.store_true(
         "--reinstall",
-        help="Reinstall the dependencies. Only works with --install-deps",
+        help="Completely remove previous installations of the dependencies and then install them afresh. Should be used along with --install-deps flag",
     )
-    parsed_arguments = argument.parse_args()
+    return argument.parse_args()
 
+
+def define_handler_instance(parsed_arguments):
     handler_instance = Handler()
     handler_instance.add_handler("clean", remove_cache)
     handler_instance.add_handler(
@@ -188,11 +200,20 @@ def main():
             reinstall=parsed_arguments.reinstall,
         ),
     )
+    return handler_instance
 
+
+def process_handlers(parsed_arguments, handler_instance):
     for key, value in vars(parsed_arguments).items():
         if isinstance(value, bool):
             if key in handler_instance.handlers and value:
                 handler_instance.call_handler(key)
+
+
+def main():
+    parsed_arguments = define_argument_parser()
+    handler_instance = define_handler_instance(parsed_arguments)
+    process_handlers(parsed_arguments, handler_instance)
 
 
 if __name__ == "__main__":
