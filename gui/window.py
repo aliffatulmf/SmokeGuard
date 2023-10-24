@@ -1,14 +1,16 @@
 import os
+from typing import Callable, List, Optional, Union
 
-from typing import Callable, List, Optional
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QCloseEvent, QIcon
-from PySide6.QtWidgets import QMainWindow, QMenuBar, QMenu, QWidget
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
+from PySide6.QtWidgets import QMainWindow, QMenu, QMenuBar, QMessageBox, QWidget
 
 from gui import proxy
 from gui.layout.camera import CameraLayout
 from gui.layout.parameter import ParameterLayout
 from gui.snapshot import SnapshotWindow
+
+from .vars import *
 
 
 class Window(QMainWindow):
@@ -23,25 +25,50 @@ class Window(QMainWindow):
         """
         self.setFixedSize(1360, 768)
         self.init_window_icon("assets/icon/icon.png")
-        self.setWindowTitle("SmokeGuard: YOLO Smoking Activity Monitor")
+        self.setWindowTitle(APP_NAME)
         self.init_background(Qt.GlobalColor.white)
 
         self.snapshotWindow: SnapshotWindow = SnapshotWindow()
         self.mainCamera: CameraLayout = self.init_camera(self.snapshotWindow)
         self.parameterLayout: ParameterLayout = self.init_parameter_layout(
-            self.mainCamera)
+            self.mainCamera
+        )
 
     def init_menu_bar(self) -> None:
         """
         Initializes the menu bar.
         """
         menubar: QMenuBar = QMenuBar(self)
-        self.create_menu(menubar, "File", [
-            self.create_action("Quit", "Ctrl+Q", self.stop_and_exit)
-        ])
-        self.create_menu(menubar, "View", [self.create_action(
-            "Snapshots", trigger_method=self.show_snapshot_window)
-        ])
+        menubar.setFixedWidth(300)
+        self.create_menu(
+            menubar,
+            "File",
+            [self.create_action("Quit", QKeySequence("Ctrl+Q"), self.stop_and_exit)],
+        )
+        self.create_menu(
+            menubar,
+            "View",
+            [self.create_action("Snapshots", None, self.show_snapshot_window)],
+        )
+        self.create_menu(
+            menubar,
+            "Help",
+            [self.create_action("About", None, self.about_box)],
+        )
+
+    def about_box(self):
+        text = f"""
+        {APP_NAME}
+        Version: {APP_VERSION}
+        Author: {APP_AUTHOR}
+        Website: {APP_WEBSITE}
+        PySide version: {APP_PYSIDE_VERSION}
+        """
+        about = QMessageBox()
+        about.setWindowIcon(QIcon("assets/icon/icon.png"))
+        about.setWindowTitle(f"About")
+        about.setText(text)
+        about.exec()
 
     def stop_and_exit(self) -> None:
         """
@@ -56,18 +83,29 @@ class Window(QMainWindow):
         """
         self.snapshotWindow.show()
 
-    def create_action(self, title: str, shortcut: Optional[str] = None, trigger_method: Callable = None) -> QAction:
+    def create_action(
+        self,
+        title: str,
+        shortcut: Union[QKeySequence, str, None] = None,
+        trigger_method: Optional[Callable] = None,
+    ) -> QAction:
         """
         Creates an action with the specified title, shortcut, and trigger method.
         """
-        action: QAction = QAction(title, self)
-        if shortcut:
+        action = QAction(title, self)
+
+        if shortcut is not None:
+            if isinstance(shortcut, str):
+                shortcut = QKeySequence(shortcut)
             action.setShortcut(shortcut)
+
         if trigger_method:
             action.triggered.connect(trigger_method)
         return action
 
-    def create_menu(self, menubar: QMenuBar, title: str, actions: List[QAction]) -> QMenu:
+    def create_menu(
+        self, menubar: QMenuBar, title: str, actions: List[QAction]
+    ) -> QMenu:
         """
         Creates a menu on the menu bar with the specified title and actions.
         """
