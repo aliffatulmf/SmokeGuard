@@ -1,14 +1,15 @@
-import time
 import datetime
+import logging
+import time
 
 import cv2
 import torch
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QImage, QPixmap
 
+from classtype import ImageType
 from config.model import ModelConfig
 from utility.color import color_label
-from classtype import ImageType
 
 
 class CameraThread(QThread):
@@ -27,19 +28,21 @@ class CameraThread(QThread):
         self.stop_requested = False
 
     def stopThread(self, safe: bool = True, exit: bool = True):
-        self.stop_requested = True
+        try:
+            self.stop_requested = True
 
-        if exit:
-            if safe:
-                while self.isRunning():
-                    time.sleep(0.1)
-                
-                self.quit()
-                self.wait()
-            else:
-                self.setTerminationEnabled(True)
-                self.terminate()
-      
+            if exit:
+                if safe:
+                    while self.isRunning():
+                        time.sleep(0.1)
+
+                    self.quit()
+                    self.wait()
+                else:
+                    self.setTerminationEnabled(True)
+                    self.terminate()
+        except Exception as e:
+            logging.error(f"Error occurred while stopping the thread: {e}")
 
     def run(self):
         model = self.load_model()
@@ -62,8 +65,10 @@ class CameraThread(QThread):
         repo_model = "custom"
         path = "weights/model.pt"
         device = "cpu"
-        
-        model = torch.hub.load(repo, repo_model, path=path, trust_repo=True, device=device)
+
+        model = torch.hub.load(
+            repo, repo_model, path=path, trust_repo=True, device=device
+        )
         model.conf = self.model_config.confidence_threshold
         model.iou = self.model_config.iou_threshold
         model.agnostic_nms = self.model_config.use_agnostic_nms
@@ -92,36 +97,41 @@ class CameraThread(QThread):
                 confidence = round(confidence, 2)
 
                 self.draw_label(frame, x_min, y_min, x_max, y_max, name, confidence)
-                
-                img = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888)
-                img_type = ImageType(image=img, name=name, confidence=confidence, timestamp=datetime.datetime.now().__str__())
+
+                img = QImage(
+                    frame.data,
+                    width,
+                    height,
+                    bytes_per_line,
+                    QImage.Format.Format_RGB888,
+                )
+                img_type = ImageType(
+                    image=img,
+                    name=name,
+                    confidence=confidence,
+                    timestamp=datetime.datetime.now().__str__(),
+                )
                 self.ImageTypeSignal.emit(img_type)
 
                 self.PixmapSignal.emit(QPixmap.fromImage(img))
 
-
-        img = QImage(frame.data, width, height, bytes_per_line, QImage.Format_RGB888)
+        img = QImage(
+            frame.data, width, height, bytes_per_line, QImage.Format.Format_RGB888
+        )
         self.ImageSignal.emit(img)
-
-
-    
-    # TODO: save frame into images folder and add info to images.json
-    # @staticmethod
-    # def saveFrame(frame, path):
-    #     cv2.imwrite(path, frame)
 
     @staticmethod
     def draw_label(frame, x_min, y_min, x_max, y_max, name, conf):
         text = f"{name} {conf}"
-        text_size, _ = cv2.getTextSize(
-            text, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.7, 1
-        )
+        text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.7, 1)
         width = text_size[0] + 10
         height = text_size[1] + 10
 
         bg_color, text_color = color_label(name)
         cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), bg_color, 2)
-        cv2.rectangle(frame, (x_min - 1, y_min), (x_min + width, y_min - height), bg_color, -1)
+        cv2.rectangle(
+            frame, (x_min - 1, y_min), (x_min + width, y_min - height), bg_color, -1
+        )
 
         org = (x_min + 5, y_min - 5)
         font = cv2.FONT_HERSHEY_COMPLEX_SMALL
