@@ -15,6 +15,7 @@ def remove_cache() -> None:
     for dirPath, _, _ in os.walk("."):
         if dirPath.endswith("__pycache__"):
             try:
+                print("Removing", dirPath)
                 shutil.rmtree(dirPath)
                 cache_found = True
             except Exception as e:
