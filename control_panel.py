@@ -166,6 +166,7 @@ class Dependency:
             "onnx>=1.10.0",
             "onnxruntime>=1.16.0",
             "rich>=13.6.0",
+            "pyside6>=6.6.0",
         ]
 
         pip_packages = ["onnx-simplifier>=0.4.1", "thop>=0.1.1"]
