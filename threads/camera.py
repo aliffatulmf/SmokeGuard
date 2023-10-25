@@ -48,26 +48,21 @@ class CameraThread(QThread):
         model = self.load_model()
         cap = self.open_camera()
 
-        self.ClassesSignal.emit(f"Class: {len(model.names)}")
         while cap.isOpened() and not self.stop_requested:
             ret, frame = cap.read()
-            dsize = (int(frame.shape[1] * 0.95), int(frame.shape[0] * 0.95))
-            frame = cv2.resize(frame, dsize)
-
             if ret:
-                predict = self.perform_inference(model, frame)
+                predict = model(frame, size=640)
                 self.draw_predictions(frame, predict)
 
         cap.release()
 
     def load_model(self):
-        repo = "ultralytics/yolov5"
-        repo_model = "custom"
-        path = "weights/model.pt"
-        device = "cpu"
-
         model = torch.hub.load(
-            repo, repo_model, path=path, trust_repo=True, device=device
+            "cache/yolov5",
+            "custom",
+            path="weights/model.pt",
+            source="local",
+            trust_repo=True,
         )
         model.conf = self.model_config.confidence_threshold
         model.iou = self.model_config.iou_threshold
@@ -80,61 +75,73 @@ class CameraThread(QThread):
     def open_camera():
         return cv2.VideoCapture(0)
 
-    @staticmethod
-    def perform_inference(model, frame):
-        return model(frame)
+    def draw_predictions(self, input_frame, predictions):
+        rgb_frame = cv2.cvtColor(input_frame, cv2.COLOR_BGR2RGB)
 
-    def draw_predictions(self, frame, predict):
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        height, width, _ = frame.shape
-        bytes_per_line = 3 * width
+        frame_height, frame_width, _ = rgb_frame.shape
+        bytes_per_line = 3 * frame_width
 
-        for df in predict.pandas().xyxy:
-            for dt in df.to_numpy():
-                # x_min, y_min, x_max, y_max, confidence, class_label, name = dt
-                x_min, y_min, x_max, y_max, confidence, _, name = dt
+        for prediction_frame in predictions.pandas().xyxy:
+            for detection in prediction_frame.to_numpy():
+                x_min, y_min, x_max, y_max, confidence, _, detected_object = detection
                 x_min, y_min, x_max, y_max = map(int, [x_min, y_min, x_max, y_max])
                 confidence = round(confidence, 2)
 
-                self.draw_label(frame, x_min, y_min, x_max, y_max, name, confidence)
+                self.draw_label(
+                    rgb_frame, x_min, y_min, x_max, y_max, detected_object, confidence
+                )
 
-                img = QImage(
-                    frame.data,
-                    width,
-                    height,
+                image = QImage(
+                    rgb_frame.data,
+                    frame_width,
+                    frame_height,
                     bytes_per_line,
                     QImage.Format.Format_RGB888,
                 )
-                img_type = ImageType(
-                    image=img,
-                    name=name,
+                image_type = ImageType(
+                    image=image,
+                    name=detected_object,
                     confidence=confidence,
                     timestamp=datetime.datetime.now().__str__(),
                 )
-                self.ImageTypeSignal.emit(img_type)
 
-                self.PixmapSignal.emit(QPixmap.fromImage(img))
+                self.ImageTypeSignal.emit(image_type)
+                self.PixmapSignal.emit(QPixmap.fromImage(image))
 
-        img = QImage(
-            frame.data, width, height, bytes_per_line, QImage.Format.Format_RGB888
+        final_image = QImage(
+            rgb_frame.data,
+            frame_width,
+            frame_height,
+            bytes_per_line,
+            QImage.Format.Format_RGB888,
         )
-        self.ImageSignal.emit(img)
+        self.ImageSignal.emit(final_image)
 
-    @staticmethod
-    def draw_label(frame, x_min, y_min, x_max, y_max, name, conf):
+    def draw_label(self, frame, x_min, y_min, x_max, y_max, name, conf):
+        # Define the label text
         text = f"{name} {conf}"
+
+        # Get the size of the text box and find the width and height
         text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.7, 1)
         width = text_size[0] + 10
         height = text_size[1] + 10
 
+        # Color the label based on the object's name
         bg_color, text_color = color_label(name)
+
+        # Draw rectangle on the frame
         cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), bg_color, 2)
+
+        # Draw the rectangle for the text background
         cv2.rectangle(
             frame, (x_min - 1, y_min), (x_min + width, y_min - height), bg_color, -1
         )
 
+        # Define the label position
         org = (x_min + 5, y_min - 5)
         font = cv2.FONT_HERSHEY_COMPLEX_SMALL
+
+        # Draw the label text on the frame
         cv2.putText(frame, text, org, font, 0.7, text_color, 1, cv2.LINE_AA)
 
     def calculate_fps(self, frame_count, start_time):

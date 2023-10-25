@@ -7,7 +7,7 @@ cm = ConfigManager()
 
 class ModelConfig:
     weights: str = cm.get("weights")
-    device: str = torch.device("cpu")
+    device = torch.device("cpu")
     imgsz: tuple = cm.get("imgsz")
     confidence_threshold: float = cm.get("confidence_threshold") / 100
     iou_threshold: float = cm.get("iou_threshold") / 100

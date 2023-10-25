@@ -1,17 +1,18 @@
-import sys
 import platform as pf
 import struct
-import cv2
+import sys
 
+import cv2
 from PySide6.QtWidgets import QApplication
+
 from gui.window import Window
 
 
 def is_win10_64bit_os() -> bool:
     return (
-        pf.system() == "Windows" and
-        pf.release() == "10" and
-        struct.calcsize("P") * 8 == 64
+        pf.system() == "Windows"
+        and pf.release() == "10"
+        and struct.calcsize("P") * 8 == 64
     )
 
 
