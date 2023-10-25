@@ -1,40 +1,20 @@
 import argparse
-import os
-import shutil
 import socket
-import subprocess
-import sys
-from functools import partial
 
-import requests
 from rich.console import Console
 
+from lib.process_handler import define_handler_instance, process_handlers
+
 HEADER = """
-███████ ███    ███  ██████  ██   ██ ███████      ██████  ██    ██  █████  ██████  ██████  
-██      ████  ████ ██    ██ ██  ██  ██          ██       ██    ██ ██   ██ ██   ██ ██   ██
-███████ ██ ████ ██ ██    ██ █████   █████       ██   ███ ██    ██ ███████ ██████  ██   ██   Control
-     ██ ██  ██  ██ ██    ██ ██  ██  ██          ██    ██ ██    ██ ██   ██ ██   ██ ██   ██   Panel
-███████ ██      ██  ██████  ██   ██ ███████      ██████   ██████  ██   ██ ██   ██ ██████    v1.0.0
+███████ ███    ███  ██████  ██   ██ ███████     ██████   ██    ██  █████  ██████  ██████
+██      ████  ████ ██    ██ ██  ██  ██          ██       ██    ██ ██   ██ ██   ██ ██   ██
+███████ ██ ████ ██ ██    ██ █████   █████       ██   ███ ██    ██ ███████ ██████  ██   ██   Control
+     ██ ██  ██  ██ ██    ██ ██  ██  ██          ██    ██ ██    ██ ██   ██ ██   ██ ██   ██   Panel
+███████ ██      ██  ██████  ██   ██ ███████      ██████  ████████ ██   ██ ██   ██ ██████    v1.0.0
 """
 
 
 console = Console()
-
-
-def remove_cache() -> None:
-    cache_found = False
-
-    for dirPath, _, _ in os.walk("."):
-        if dirPath.endswith("__pycache__"):
-            try:
-                print("Removing", dirPath)
-                shutil.rmtree(dirPath)
-                cache_found = True
-            except Exception as e:
-                print(f"Error occurred while removing cache: {e}")
-
-    if not cache_found:
-        print("No cache found")
 
 
 def is_online() -> bool:
@@ -44,189 +24,6 @@ def is_online() -> bool:
     except OSError as err:
         print(f"OS Error: {err}")
     return False
-
-
-class Dependency:
-    def __init__(self):
-        self.url = "https://raw.githubusercontent.com/ultralytics/yolov5/master/requirements.txt"
-        self.mode = "INSTALL"
-
-    def fetch_requirements(self) -> list:
-        if not is_online():
-            print("You are offline. Please connect to the internet first.")
-            sys.exit(1)
-
-        try:
-            response = requests.get(self.url, timeout=5)
-            response.raise_for_status()
-        except requests.exceptions.RequestException as err:
-            print(f"Error occurred: {err}")
-            sys.exit(1)
-
-        requirements: list = self.parse_response(response)
-
-        return requirements
-
-    def parse_response(self, response) -> list:
-        try:
-            requirements: list = [
-                line.strip()
-                for line in response.text.split("\n")
-                if line and not line.startswith("#")
-            ]
-        except Exception as err:
-            print(f"Error occurred while parsing the response: {err}")
-            sys.exit(1)
-
-        return requirements
-
-    def remove_version(self, dependency: str) -> str:
-        # Define the list of operators
-        operators: list[str] = [">=", "<=", "==", "<", ">"]
-
-        # Check for each operator in the dependency
-        for operator in operators:
-            if operator in dependency:
-                # Split the dependency on the operator and keep the first part
-                # For example, if dependency is "numpy>=1.18.5", dep will be "numpy"
-                dep: str = dependency.split(operator)[0]
-
-                return self.remove_inline_comments(dep)
-
-        # If no operator found, return the dependency
-        # For example, if dependency is "numpy", it will return "numpy"
-        return dependency.strip()
-
-    def remove_inline_comments(self, dependency: str) -> str:
-        if "#" in dependency:
-            # For example, if dependency is "numpy # numpy is a dependency", dep will be "numpy"
-            dep = dependency.split("#")[0]
-
-            return dep.strip()
-
-        # If no inline comment found, return the dependency
-        # For example, if dependency is "numpy", it will return "numpy"
-        return dependency.strip()
-
-    def required_dependencies(self, dependency: list, *args) -> list:
-        for arg in args:
-            if arg not in dependency:
-                dependency.append(arg)
-
-        return dependency
-
-    def remove_version_and_comments(self, package) -> str:
-        package = self.remove_version(package)
-        package = self.remove_inline_comments(package)
-        return package.strip()
-
-    def run_command(self, command: list):
-        try:
-            subprocess.check_call(command)
-        except subprocess.CalledProcessError as error:
-            console.print(f"[bold red][ERROR][/bold red] {error}")
-            sys.exit(1)
-
-    def create_command(
-        self,
-        base_command: list,
-        packages: list,
-        use_latest: bool,
-        force_reinstall: bool,
-    ):
-        command = base_command.copy()
-        if force_reinstall:
-            command.append("--force-reinstall")
-        if use_latest:
-            packages = [
-                self.remove_version_and_comments(package) for package in packages
-            ]
-        command.extend(packages)
-        return command
-
-    def install(self, use_latest: bool = False, force_reinstall: bool = False) -> None:
-        mamba_packages = [
-            "pytorch",
-            "torchvision",
-            "torchaudio",
-            "cpuonly",
-            "gitpython>=3.1.30",
-            "matplotlib>=3.3",
-            "numpy>=1.22.2",
-            "opencv>=4.1.1",
-            "Pillow>=7.1.2",
-            "psutil",
-            "PyYAML>=5.3.1",
-            "requests>=2.23.0",
-            "scipy>=1.4.1",
-            "torchvision>=0.9.0",
-            "tqdm>=4.64.0",
-            "pandas>=1.1.4",
-            "seaborn>=0.11.0",
-            "onnx>=1.10.0",
-            "onnxruntime>=1.16.0",
-            "rich>=13.6.0",
-            "pyside6>=6.6.0",
-        ]
-
-        pip_packages = ["onnx-simplifier>=0.4.1", "thop>=0.1.1"]
-
-        mamba_command = self.create_command(
-            [
-                "mamba",
-                "install",
-                "--name",
-                "smokeguard",
-                "-c",
-                "pytorch",
-                "-c",
-                "conda-forge",
-            ],
-            mamba_packages,
-            use_latest,
-            force_reinstall,
-        )
-
-        pip_command = self.create_command(
-            [sys.executable, "-m", "pip", "install"],
-            pip_packages,
-            use_latest,
-            force_reinstall,
-        )
-
-        self.run_command(mamba_command)
-        self.run_command(pip_command)
-
-
-class Handler:
-    def __init__(self):
-        self.handlers: dict = {}
-
-    def add_handler(self, name, handler):
-        self.handler_check(name, handler)
-        self.handlers[name] = handler
-
-    def handler_check(self, name, handler):
-        self.check_name(name)
-        self.check_callable(handler)
-        self.check_existence(name)
-
-    def check_name(self, name):
-        if not name:
-            raise ValueError("Handler must have a name")
-
-    def check_callable(self, handler):
-        if not callable(handler):
-            raise ValueError("Handler must be callable")
-
-    def check_existence(self, name):
-        if name in self.handlers:
-            raise ValueError(f"Handler with name {name} already exists")
-
-    def call_handler(self, name, *args, **kwargs):
-        if name not in self.handlers:
-            raise ValueError(f"Handler with name {name} does not exist")
-        return self.handlers[name](*args, **kwargs)
 
 
 class Arguments(argparse.ArgumentParser):
@@ -240,15 +37,7 @@ class Arguments(argparse.ArgumentParser):
         self.add_argument(*args, **kwargs, action="store_true")
 
     def store_string(self, *args, **kwargs):
-        self.add_argument(*args, **kwargs, type=str)
-
-
-def dependency_handler(**kwargs):
-    dependency = Dependency()
-    dependency.install(
-        kwargs["latest"] if "latest" in kwargs else False,
-        kwargs["reinstall"] if "reinstall" in kwargs else False,
-    )
+        self.add_argument(*args, **kwargs, default="", type=str)
 
 
 def define_argument_parser():
@@ -260,39 +49,18 @@ def define_argument_parser():
     )
     argument.store_true(
         "-i",
-        "--install-deps",
+        "--install-required",
         help="Download and install dependencies listed in the YOLOv5 requirements",
     )
     argument.store_true(
-        "--latest",
-        help="Install the latest versions of the YOLOv5 dependencies. Should be used along with --install-deps flag",
-    )
-    argument.store_true(
         "--reinstall",
-        help="Completely remove previous installations of the dependencies and then install them afresh. Should be used along with --install-deps flag",
+        help="Completely remove previous installations of the dependencies and then install them afresh. Should be used along with --install-required flag",
+    )
+    argument.store_string(
+        "--name",
+        help="Specify the Environment variable name. This is mandatory if you are using a mamba environment.",
     )
     return argument.parse_args()
-
-
-def define_handler_instance(parsed_arguments):
-    handler_instance = Handler()
-    handler_instance.add_handler("clean", remove_cache)
-    handler_instance.add_handler(
-        "install_deps",
-        partial(
-            dependency_handler,
-            latest=parsed_arguments.latest,
-            reinstall=parsed_arguments.reinstall,
-        ),
-    )
-    return handler_instance
-
-
-def process_handlers(parsed_arguments, handler_instance):
-    for key, value in vars(parsed_arguments).items():
-        if isinstance(value, bool):
-            if key in handler_instance.handlers and value:
-                handler_instance.call_handler(key)
 
 
 def main():
