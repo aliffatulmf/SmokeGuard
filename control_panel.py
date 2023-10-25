@@ -7,6 +7,18 @@ import sys
 from functools import partial
 
 import requests
+from rich.console import Console
+
+HEADER = """
+███████ ███    ███  ██████  ██   ██ ███████      ██████  ██    ██  █████  ██████  ██████  
+██      ████  ████ ██    ██ ██  ██  ██          ██       ██    ██ ██   ██ ██   ██ ██   ██
+███████ ██ ████ ██ ██    ██ █████   █████       ██   ███ ██    ██ ███████ ██████  ██   ██   Control
+     ██ ██  ██  ██ ██    ██ ██  ██  ██          ██    ██ ██    ██ ██   ██ ██   ██ ██   ██   Panel
+███████ ██      ██  ██████  ██   ██ ███████      ██████   ██████  ██   ██ ██   ██ ██████    v1.0.0
+"""
+
+
+console = Console()
 
 
 def remove_cache() -> None:
@@ -37,6 +49,7 @@ def is_online() -> bool:
 class Dependency:
     def __init__(self):
         self.url = "https://raw.githubusercontent.com/ultralytics/yolov5/master/requirements.txt"
+        self.mode = "INSTALL"
 
     def fetch_requirements(self) -> list:
         if not is_online():
@@ -95,25 +108,93 @@ class Dependency:
         # For example, if dependency is "numpy", it will return "numpy"
         return dependency.strip()
 
-    def install(self, latest: bool = False, reinstall: bool = False) -> None:
-        cmd = [sys.executable, "-m", "pip", "install"]
+    def required_dependencies(self, dependency: list, *args) -> list:
+        for arg in args:
+            if arg not in dependency:
+                dependency.append(arg)
 
-        if reinstall:
-            cmd.append("--force-reinstall")
+        return dependency
 
-        for dep in self.fetch_requirements():
-            dep = self.remove_inline_comments(dep)
-            if latest:
-                dep: str = self.remove_version(dep)
+    def remove_version_and_comments(self, package) -> str:
+        package = self.remove_version(package)
+        package = self.remove_inline_comments(package)
+        return package.strip()
 
-            cmd.append(dep.strip())
-
-        print("Installing dependencies...")
+    def run_command(self, command: list):
         try:
-            subprocess.check_call(cmd, stdout=sys.stdout)
-        except subprocess.CalledProcessError as err:
-            print(f"Error occurred while installing dependencies: {err}")
+            subprocess.check_call(command)
+        except subprocess.CalledProcessError as error:
+            console.print(f"[bold red][ERROR][/bold red] {error}")
             sys.exit(1)
+
+    def create_command(
+        self,
+        base_command: list,
+        packages: list,
+        use_latest: bool,
+        force_reinstall: bool,
+    ):
+        command = base_command.copy()
+        if force_reinstall:
+            command.append("--force-reinstall")
+        if use_latest:
+            packages = [
+                self.remove_version_and_comments(package) for package in packages
+            ]
+        command.extend(packages)
+        return command
+
+    def install(self, use_latest: bool = False, force_reinstall: bool = False) -> None:
+        mamba_packages = [
+            "pytorch",
+            "torchvision",
+            "torchaudio",
+            "cpuonly",
+            "gitpython>=3.1.30",
+            "matplotlib>=3.3",
+            "numpy>=1.22.2",
+            "opencv>=4.1.1",
+            "Pillow>=7.1.2",
+            "psutil",
+            "PyYAML>=5.3.1",
+            "requests>=2.23.0",
+            "scipy>=1.4.1",
+            "torchvision>=0.9.0",
+            "tqdm>=4.64.0",
+            "pandas>=1.1.4",
+            "seaborn>=0.11.0",
+            "onnx>=1.10.0",
+            "onnxruntime>=1.16.0",
+            "rich>=13.6.0",
+        ]
+
+        pip_packages = ["onnx-simplifier>=0.4.1", "thop>=0.1.1"]
+
+        mamba_command = self.create_command(
+            [
+                "mamba",
+                "install",
+                "--name",
+                "smokeguard",
+                "-c",
+                "pytorch",
+                "-c",
+                "conda-forge",
+            ],
+            mamba_packages,
+            use_latest,
+            force_reinstall,
+        )
+
+        pip_command = self.create_command(
+            [sys.executable, "-m", "pip", "install"],
+            pip_packages,
+            use_latest,
+            force_reinstall,
+        )
+
+        self.run_command(mamba_command)
+        self.run_command(pip_command)
 
 
 class Handler:
@@ -156,6 +237,9 @@ class Arguments(argparse.ArgumentParser):
 
     def store_true(self, *args, **kwargs):
         self.add_argument(*args, **kwargs, action="store_true")
+
+    def store_string(self, *args, **kwargs):
+        self.add_argument(*args, **kwargs, type=str)
 
 
 def dependency_handler(**kwargs):
@@ -217,4 +301,5 @@ def main():
 
 
 if __name__ == "__main__":
+    console.print(HEADER, style="cyan")
     main()
