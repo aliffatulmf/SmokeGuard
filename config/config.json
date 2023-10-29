@@ -5,8 +5,8 @@
         640,
         640
     ],
-    "confidence_threshold": 50,
-    "iou_threshold": 45,
+    "confidence_threshold": 45,
+    "iou_threshold": 20,
     "use_agnostic_nms": true,
     "enable_augmentation": true,
     "hide_labels_enabled": false,

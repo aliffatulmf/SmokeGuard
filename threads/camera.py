@@ -9,6 +9,7 @@ from PySide6.QtGui import QImage, QPixmap
 
 from classtype import ImageType
 from config.model import ModelConfig
+from lib.log import *
 from utility.color import color_label
 
 
@@ -24,12 +25,14 @@ class CameraThread(QThread):
     def __init__(self, parent):
         super().__init__(parent)
 
+        log_info("Starting Camera Thread")
         self.model_config = ModelConfig()
         self.stop_requested = False
 
     def stopThread(self, safe: bool = True, exit: bool = True):
         try:
             self.stop_requested = True
+            log_info("Trying to stop the thread")
 
             if exit:
                 if safe:
@@ -38,25 +41,30 @@ class CameraThread(QThread):
 
                     self.quit()
                     self.wait()
+                    log_info("Thread stopped successfully")
                 else:
+                    log_warning("Forcefully terminating the thread")
                     self.setTerminationEnabled(True)
                     self.terminate()
         except Exception as e:
             logging.error(f"Error occurred while stopping the thread: {e}")
 
     def run(self):
-        model = self.load_model()
         cap = self.open_camera()
+        model = self.load_model()
 
+        log_success("Starting detection")
         while cap.isOpened() and not self.stop_requested:
             ret, frame = cap.read()
             if ret:
-                predict = model(frame, size=640)
+                predict = model(frame, size=1920)
                 self.draw_predictions(frame, predict)
 
         cap.release()
 
     def load_model(self):
+        log_info("Model loading")
+
         model = torch.hub.load(
             "cache/yolov5",
             "custom",
@@ -64,15 +72,26 @@ class CameraThread(QThread):
             source="local",
             trust_repo=True,
         )
+        log_info("Model loaded successfully")
+
         model.conf = self.model_config.confidence_threshold
         model.iou = self.model_config.iou_threshold
         model.agnostic_nms = self.model_config.use_agnostic_nms
         model.augment = self.model_config.enable_augmentation
 
+        log_info("Checking for GPU availability")
+        if torch.cuda.is_available():
+            log_success("GPU found. Moving model to GPU")
+            model.cuda()
+        else:
+            log_warning("GPU not found. Moving model to CPU")
+            model.cpu()
+
         return model
 
     @staticmethod
     def open_camera():
+        log_info("Opening camera")
         return cv2.VideoCapture(0)
 
     def draw_predictions(self, input_frame, predictions):

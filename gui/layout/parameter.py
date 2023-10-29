@@ -1,10 +1,18 @@
-from PySide6.QtWidgets import (QGroupBox, QVBoxLayout, QPushButton, QSpinBox,
-                               QLabel, QComboBox, QFrame, QMessageBox, QWidget)
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QGroupBox,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from config.parameter import ConfigManager
 from gui.layout.camera import CameraLayout
-
 
 ENABLE = "Enable"
 DISABLE = "Disable"
@@ -30,7 +38,7 @@ PARAMETERS = {
     "hardware_acceleration": {
         "type": "dropdown",
         "label": "Hardware Acceleration",
-        "items": ["CPU"],
+        "items": ["Automatic"],
         "value": _local_config.get("device"),
         "disabled": True,
     },
@@ -53,7 +61,7 @@ class ParameterLayout:
     def __init__(self, parent: QWidget = None):
         self.parent = parent
         self.camera_layout = None
-        
+
         self.frame = QFrame()
         self.frame.setGeometry(20, 50, 200, 768)
         self.frame.setParent(parent)
@@ -66,7 +74,7 @@ class ParameterLayout:
 
         self.top_vbox = QVBoxLayout(self.top_groupbox)
         self.top_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
-    
+
     def set_thread(self, layout: CameraLayout = None):
         self.camera_layout = layout
 
@@ -76,7 +84,9 @@ class ParameterLayout:
                 if value["type"] == "spinbox":
                     _local_config.set(key, self.__dict__[f"{key}_form"].value())
                 elif value["type"] == "dropdown":
-                    _local_config.set(key, self.__dict__[f"{key}_form"].currentText() == ENABLE)
+                    _local_config.set(
+                        key, self.__dict__[f"{key}_form"].currentText() == ENABLE
+                    )
 
         _local_config.save()
 
@@ -85,7 +95,7 @@ class ParameterLayout:
         message_box.setWindowTitle("Notification")
         message_box.setText("Application will quit to apply changes.")
         message_box.exec()
-        
+
         self.parent.close()
 
     def actionButton(self):
@@ -95,11 +105,11 @@ class ParameterLayout:
 
         reset_btn = QPushButton()
         reset_btn.setText("Reset")
-        
+
         # def restart_thread():
         #     self.camera_layout.stop_without_exit()
         #     self.camera_layout.start()
-            
+
         # restart_btn = QPushButton()
         # restart_btn.setText("Restart")
         # restart_btn.clicked.connect(lambda: restart_thread())

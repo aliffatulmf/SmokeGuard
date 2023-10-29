@@ -3,14 +3,16 @@ import socket
 
 from rich.console import Console
 
-from lib.process_handler import define_handler_instance, process_handlers
+from lib.cache import remove_cache
+from lib.dependency import PIP_PACKAGES, install_requirements
+from lib.entry import run_gui
 
 HEADER = """
-███████ ███    ███  ██████  ██   ██ ███████     ██████   ██    ██  █████  ██████  ██████
-██      ████  ████ ██    ██ ██  ██  ██          ██       ██    ██ ██   ██ ██   ██ ██   ██
-███████ ██ ████ ██ ██    ██ █████   █████       ██   ███ ██    ██ ███████ ██████  ██   ██   Control
-     ██ ██  ██  ██ ██    ██ ██  ██  ██          ██    ██ ██    ██ ██   ██ ██   ██ ██   ██   Panel
-███████ ██      ██  ██████  ██   ██ ███████      ██████  ████████ ██   ██ ██   ██ ██████    v1.0.0
+███████ ███    ███  ██████  ██   ██ ███████     ██████   ██    ██  █████  ██████  ██████    Control
+██      ████  ████ ██    ██ ██  ██  ██          ██       ██    ██ ██   ██ ██   ██ ██   ██   Panel
+███████ ██ ████ ██ ██    ██ █████   █████       ██   ███ ██    ██ ███████ ██████  ██   ██   v1.0.0
+     ██ ██  ██  ██ ██    ██ ██  ██  ██          ██    ██ ██    ██ ██   ██ ██   ██ ██   ██
+███████ ██      ██  ██████  ██   ██ ███████      ██████  ████████ ██   ██ ██   ██ ██████    YOLOv5
 """
 
 
@@ -22,53 +24,92 @@ def is_online() -> bool:
         socket.create_connection(("1.1.1.1", 443), 2)
         return True
     except OSError as err:
-        print(f"OS Error: {err}")
-    return False
-
-
-class Arguments(argparse.ArgumentParser):
-    def __init__(self):
-        super().__init__(
-            prog="control_panel.py",
-            description="Control Panel for YOLOv5",
-        )
-
-    def store_true(self, *args, **kwargs):
-        self.add_argument(*args, **kwargs, action="store_true")
-
-    def store_string(self, *args, **kwargs):
-        self.add_argument(*args, **kwargs, default="", type=str)
+        console.log(f"[bold red][ERROR][/bold red] {err}")
+        return False
 
 
 def define_argument_parser():
-    argument = Arguments()
-    argument.store_true(
+    parser = argparse.ArgumentParser(
+        prog="control_panel.py", description="Control Panel for SmokeGuard"
+    )
+
+    parser.add_argument(
         "-c",
         "--clean",
+        action="store_true",
         help="Delete all __pycache__ directories in the current directory and its subdirectories",
     )
-    argument.store_true(
-        "-i",
+    parser.add_argument(
         "--install-required",
-        help="Download and install dependencies listed in the YOLOv5 requirements",
+        action="store_true",
+        help="Download and install required dependencies",
     )
-    argument.store_true(
+    parser.add_argument(
         "--reinstall",
-        help="Completely remove previous installations of the dependencies and then install them afresh. Should be used along with --install-required flag",
+        action="store_true",
+        help="Force reinstall required dependencies. Should be used along with --install-required flag",
     )
-    argument.store_string(
-        "--name",
-        help="Specify the Environment variable name. This is mandatory if you are using a mamba environment.",
+    parser.add_argument(
+        "--install",
+        nargs="*",
+        help="Install dependencies manually",
     )
-    return argument.parse_args()
+
+    parser.add_argument(
+        "-e",
+        "--exclude",
+        nargs="*",
+        help="Exclude directories from cache removal",
+    )
+
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show verbose output",
+    )
+
+    parser.add_argument(
+        "--device",
+        type=str,
+        choices=["cpu", "cuda", "auto"],
+        default="auto",
+        help="Device to use for inference",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--run",
+        action="store_true",
+        help="Run the program",
+    )
+
+    return parser.parse_args()
 
 
-def main():
-    parsed_arguments = define_argument_parser()
-    handler_instance = define_handler_instance(parsed_arguments)
-    process_handlers(parsed_arguments, handler_instance)
+def run_app():
+    args = define_argument_parser()
+
+    if args.clean:
+        remove_cache(args.exclude if args.exclude else [], args.verbose)
+
+    if args.install_required:
+        if not is_online():
+            console.print("[bold red][ERROR][/bold red] No internet connection")
+            exit(1)
+
+        install_requirements(PIP_PACKAGES, args.reinstall, args.verbose)
+
+    if args.install:
+        if not is_online():
+            console.print("[bold red][ERROR][/bold red] No internet connection")
+            exit(1)
+
+        install_requirements(args.install, args.reinstall, args.verbose)
+
+    if args.run:
+        run_gui()
 
 
 if __name__ == "__main__":
     console.print(HEADER, style="cyan")
-    main()
+    run_app()

@@ -1,32 +1,34 @@
-import subprocess as sp
+import pkgutil
+import subprocess
 import sys
 
 from rich.console import Console
 
+from lib.log import log_fatal, log_info, log_success
+
 console = Console()
 
-MAMBA_PACKAGES = [
-    "pytorch",
-    "torchvision",
-    "torchaudio",
-    "cpuonly",
-    "gitpython",
-    "matplotlib",
-    "numpy",
-    "Pillow",
-    "psutil",
-    "PyYAML",
-    "requests",
-    "scipy",
-    "torchvision",
-    "tqdm",
-    "pandas",
-    "seaborn",
-    "rich",
-    "pyside6",
+
+PIP_PACKAGES = [
+    "gitpython>=3.1.30",
+    "matplotlib>=3.3",
+    "numpy>=1.22.2",
+    "opencv-python>=4.1.1",
+    "Pillow>=7.1.2",
+    "psutil  ",
+    "PyYAML>=5.3.1",
+    "requests>=2.23.0",
+    "scipy>=1.4.1",
+    "thop>=0.1.1  ",
+    "torch>=1.8.0  ",
+    "torchvision>=0.9.0",
+    "tqdm>=4.64.0",
+    "ultralytics>=8.0.147",
+    "pandas>=1.1.4",
+    "seaborn>=0.11.0",
+    "setuptools>=65.5.1 ",
+    "dill>=0.3.7",
 ]
-MAMBA_CHANNELS = ["conda-forge", "pytorch"]
-PIP_PACKAGES = ["thop", "opencv-contrib-python"]
 
 
 class Module:
@@ -35,28 +37,11 @@ class Module:
 
     def run_command(self, cmd: list):
         try:
-            sp.check_call(cmd)
-        except sp.CalledProcessError as e:
+            subprocess.check_call(cmd)
+        except subprocess.CalledProcessError as e:
             console.log(f"[bold red][ERROR][/bold red] {e}")
             # sys.exit(1)
             exit(1)
-
-    def mamba_command(self, name: str, reinstall: bool = False):
-        cmd = [
-            "mamba",
-            "install",
-            "--yes",
-            "--strict-channel-priority",
-            "--quiet",
-            "--name",
-            name,
-        ]
-        if reinstall:
-            cmd.append("--force-reinstall")
-        for channel in MAMBA_CHANNELS:
-            cmd.extend(["-c", channel])
-        cmd.extend(MAMBA_PACKAGES)
-        return cmd
 
     def pip_command(self, packages: list[str], reinstall: bool = False):
         cmd = [sys.executable, "-m", "pip", "install", "--quiet"]
@@ -66,14 +51,9 @@ class Module:
         return cmd
 
     def install_required(self, name: str, reinstall: bool = False):
-        mamba = self.mamba_command(name, reinstall)
         pip = self.pip_command(PIP_PACKAGES, reinstall)
 
         tasks = [
-            {
-                "log": "[bold green][INSTALL][/bold green] [italic green]MAMBA PACKAGES[/italic green]",
-                "command": mamba,
-            },
             {
                 "log": "[bold green][INSTALL][/bold green] [italic green]PIP PACKAGES[/italic green]",
                 "command": pip,
@@ -87,3 +67,42 @@ class Module:
 
     def install_manual(self):
         pass
+
+
+def clean_args(args: list[any]) -> list[any]:
+    """Removes empty items within the list if only strings are present."""
+    if all(isinstance(arg, str) for arg in args):
+        [arg for arg in args if arg]
+    return args
+
+
+def install_requirements(
+    names: list[str], reinstall: bool = False, verbose: bool = False
+):
+    if verbose:
+        log_info("Installing dependencies ...")
+
+    cleaned_args = clean_args(names)
+    pip_args = [sys.executable, "-m", "pip", "install"]
+
+    if reinstall:
+        if verbose:
+            log_info("Force reinstalling dependencies ...")
+        pip_args.append("--force-reinstall")
+
+    if verbose:
+        pip_args.append("--verbose")
+    else:
+        pip_args.append("--quiet")
+
+    try:
+        pip_args.extend(cleaned_args)
+
+        subprocess.check_call(pip_args)
+        log_success("Successfully installed dependencies")
+    except subprocess.CalledProcessError as e:
+        log_fatal(f"Error occurred while installing dependencies: {e}")
+
+
+def is_installed(name: str) -> bool:
+    return pkgutil.find_loader(name) is not None
