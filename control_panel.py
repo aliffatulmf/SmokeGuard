@@ -1,22 +1,23 @@
 import argparse
+import logging
 import socket
 
-from rich.console import Console
-
-from lib.cache import remove_cache
-from lib.dependency import PIP_PACKAGES, install_requirements
-from lib.entry import run_gui
+from lib.entry import preprocess, run
+from lib.log import Logger
 
 HEADER = """
-███████ ███    ███  ██████  ██   ██ ███████     ██████   ██    ██  █████  ██████  ██████    Control
-██      ████  ████ ██    ██ ██  ██  ██          ██       ██    ██ ██   ██ ██   ██ ██   ██   Panel
-███████ ██ ████ ██ ██    ██ █████   █████       ██   ███ ██    ██ ███████ ██████  ██   ██   v1.0.0
+███████ ███    ███  ██████  ██   ██ ███████      ██████  ██    ██  █████  ██████  ██████
+██      ████  ████ ██    ██ ██  ██  ██          ██       ██    ██ ██   ██ ██   ██ ██   ██
+███████ ██ ████ ██ ██    ██ █████   █████       ██   ███ ██    ██ ███████ ██████  ██   ██
      ██ ██  ██  ██ ██    ██ ██  ██  ██          ██    ██ ██    ██ ██   ██ ██   ██ ██   ██
-███████ ██      ██  ██████  ██   ██ ███████      ██████  ████████ ██   ██ ██   ██ ██████    YOLOv5
+███████ ██      ██  ██████  ██   ██ ███████      ██████  ████████ ██   ██ ██   ██ ██████
+[italic][bold red]Control Panel[/bold red] [underline]based on[/underline] [bold blue]Ultralytics/YOLOv5[/bold blue][/italic]
 """
 
 
-console = Console()
+console = Logger()
+# disable global logging
+logging.disable()
 
 
 def is_online() -> bool:
@@ -24,7 +25,7 @@ def is_online() -> bool:
         socket.create_connection(("1.1.1.1", 443), 2)
         return True
     except OSError as err:
-        console.log(f"[bold red][ERROR][/bold red] {err}")
+        console.fatal(f"Error: {err}")
         return False
 
 
@@ -65,7 +66,14 @@ def define_argument_parser():
     parser.add_argument(
         "--verbose",
         action="store_true",
+        default=False,
         help="Show verbose output",
+    )
+
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Hide all output except for errors",
     )
 
     parser.add_argument(
@@ -74,6 +82,14 @@ def define_argument_parser():
         choices=["cpu", "cuda", "auto"],
         default="auto",
         help="Device to use for inference",
+    )
+
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        default="weights/model.pt",
+        help="Path to model.pt file",
     )
 
     parser.add_argument(
@@ -86,30 +102,10 @@ def define_argument_parser():
     return parser.parse_args()
 
 
-def run_app():
-    args = define_argument_parser()
-
-    if args.clean:
-        remove_cache(args.exclude if args.exclude else [], args.verbose)
-
-    if args.install_required:
-        if not is_online():
-            console.print("[bold red][ERROR][/bold red] No internet connection")
-            exit(1)
-
-        install_requirements(PIP_PACKAGES, args.reinstall, args.verbose)
-
-    if args.install:
-        if not is_online():
-            console.print("[bold red][ERROR][/bold red] No internet connection")
-            exit(1)
-
-        install_requirements(args.install, args.reinstall, args.verbose)
-
-    if args.run:
-        run_gui()
-
-
 if __name__ == "__main__":
-    console.print(HEADER, style="cyan")
-    run_app()
+    console.print(HEADER, style="cyan", justify="center")
+
+    args = define_argument_parser()
+    kwargs = vars(args)
+    preprocess(args)
+    run(**kwargs)

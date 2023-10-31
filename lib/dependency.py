@@ -2,12 +2,8 @@ import pkgutil
 import subprocess
 import sys
 
-from rich.console import Console
-
-from lib.log import log_fatal, log_info, log_success
-
-console = Console()
-
+from lib.logger import VerboseLogger, console
+from lib.logger.level import *
 
 PIP_PACKAGES = [
     "gitpython>=3.1.30",
@@ -40,7 +36,6 @@ class Module:
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
             console.log(f"[bold red][ERROR][/bold red] {e}")
-            # sys.exit(1)
             exit(1)
 
     def pip_command(self, packages: list[str], reinstall: bool = False):
@@ -65,9 +60,6 @@ class Module:
                 status.update(task["log"])
                 self.run_command(task["command"])
 
-    def install_manual(self):
-        pass
-
 
 def clean_args(args: list[any]) -> list[any]:
     """Removes empty items within the list if only strings are present."""
@@ -77,17 +69,18 @@ def clean_args(args: list[any]) -> list[any]:
 
 
 def install_requirements(
-    names: list[str], reinstall: bool = False, verbose: bool = False
+    names: list[str] = PIP_PACKAGES,
+    reinstall: bool = False,
+    verbose: bool = False,
 ):
-    if verbose:
-        log_info("Installing dependencies ...")
+    log = VerboseLogger(verbose)
+    log.print_verbose(INFO, "Installing dependencies ...")
 
-    cleaned_args = clean_args(names)
+    cleaned_args = clean_args(args=names)
     pip_args = [sys.executable, "-m", "pip", "install"]
 
     if reinstall:
-        if verbose:
-            log_info("Force reinstalling dependencies ...")
+        log.print_verbose(WARNING, "Force reinstalling dependencies ...")
         pip_args.append("--force-reinstall")
 
     if verbose:
@@ -99,9 +92,9 @@ def install_requirements(
         pip_args.extend(cleaned_args)
 
         subprocess.check_call(pip_args)
-        log_success("Successfully installed dependencies")
+        log.print_verbose(SUCCESS, "Successfully installed dependencies")
     except subprocess.CalledProcessError as e:
-        log_fatal(f"Error occurred while installing dependencies: {e}")
+        log.print_verbose(FATAL, f"Error occurred while installing dependencies: {e}")
 
 
 def is_installed(name: str) -> bool:

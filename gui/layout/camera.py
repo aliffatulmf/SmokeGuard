@@ -1,7 +1,8 @@
 from PySide6.QtCore import Qt, Slot
-from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QFrame, QWidget
-from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import QFrame, QGroupBox, QLabel, QVBoxLayout, QWidget
 
+from lib.log import *
 from threads.camera import CameraThread
 
 
@@ -19,10 +20,12 @@ class CameraLayout(QWidget):
     WIDTH = 640
     HEIGHT = 640
 
-    def __init__(self, parent: QWidget):
+    def __init__(self, parent: QWidget, camera_thread: CameraThread, **kwargs):
         super().__init__(parent)
+        self.kwargs = kwargs
+        self.console = Logger()
         self.parent: QWidget = parent
-        self.ct = None
+        self.ct = camera_thread
 
         self.setup_ui()
 
@@ -68,8 +71,10 @@ class CameraLayout(QWidget):
 
         self.video.setParent(self.groupbox)
 
+    def getGroupBox(self) -> QGroupBox:
+        return self.groupbox
+
     def init(self):
-        self.ct = CameraThread(self.groupbox)
         self.ct.ImageSignal.connect(self.frame_signal)
 
     @Slot(QImage)
@@ -103,4 +108,4 @@ class CameraLayout(QWidget):
             raise ThreadInactiveError
         else:
             if self.ct != None:
-                self.ct.stopThread(True)
+                self.ct.stopThread()

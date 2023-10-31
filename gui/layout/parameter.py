@@ -12,13 +12,12 @@ from PySide6.QtWidgets import (
 )
 
 from config.parameter import ConfigManager
-from gui.layout.camera import CameraLayout
 
 ENABLE = "Enable"
 DISABLE = "Disable"
 SWITCH = [ENABLE, DISABLE]
 
-_local_config = ConfigManager()
+config_manager = ConfigManager()
 
 PARAMETERS = {
     "confidence_threshold": {
@@ -26,33 +25,39 @@ PARAMETERS = {
         "label": "Confidence Threshold",
         "minimum": 1,
         "maximum": 100,
-        "value": _local_config.get("confidence_threshold"),
+        "value": config_manager.get("confidence_threshold"),
     },
     "iou_threshold": {
         "type": "spinbox",
         "label": "Overlap Threshold",
         "minimum": 1,
         "maximum": 100,
-        "value": _local_config.get("iou_threshold"),
+        "value": config_manager.get("iou_threshold"),
     },
-    "hardware_acceleration": {
+    "automatic_mixed_precision": {
         "type": "dropdown",
-        "label": "Hardware Acceleration",
-        "items": ["Automatic"],
-        "value": _local_config.get("device"),
-        "disabled": True,
+        "label": "Automatic Mixed Precision",
+        "items": SWITCH,
+        "value": config_manager.get("automatic_mixed_precision"),
     },
+    # "hardware_acceleration": {
+    #     "type": "dropdown",
+    #     "label": "Hardware Acceleration",
+    #     "items": ["Automatic"],
+    #     "value": config_manager.get("device"),
+    #     "disabled": True,
+    # },
     "use_agnostic_nms": {
         "type": "dropdown",
         "label": "Class-Agnostic NMS",
         "items": SWITCH,
-        "value": _local_config.get("use_agnostic_nms"),
+        "value": config_manager.get("use_agnostic_nms"),
     },
     "enable_augmentation": {
         "type": "dropdown",
         "label": "Data Augmentation",
         "items": SWITCH,
-        "value": _local_config.get("enable_augmentation"),
+        "value": config_manager.get("enable_augmentation"),
     },
 }
 
@@ -60,7 +65,6 @@ PARAMETERS = {
 class ParameterLayout:
     def __init__(self, parent: QWidget = None):
         self.parent = parent
-        self.camera_layout = None
 
         self.frame = QFrame()
         self.frame.setGeometry(20, 50, 200, 768)
@@ -75,54 +79,63 @@ class ParameterLayout:
         self.top_vbox = QVBoxLayout(self.top_groupbox)
         self.top_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-    def set_thread(self, layout: CameraLayout = None):
-        self.camera_layout = layout
-
-    def _saveValue(self):
+    def saveValue(self):
         for key, value in PARAMETERS.items():
+            form_value = self.__dict__[f"{key}_form"]
             if "disabled" not in value:
-                if value["type"] == "spinbox":
-                    _local_config.set(key, self.__dict__[f"{key}_form"].value())
-                elif value["type"] == "dropdown":
-                    _local_config.set(
-                        key, self.__dict__[f"{key}_form"].currentText() == ENABLE
-                    )
+                config_manager.set(
+                    key,
+                    form_value.value()
+                    if value["type"] == "spinbox"
+                    else form_value.currentText() == ENABLE,
+                )
 
-        _local_config.save()
+        config_manager.save()
+        self.saveNotificationBox()
+        self.parent.close()
 
+    @staticmethod
+    def saveNotificationBox():
         message_box = QMessageBox()
         message_box.setIcon(QMessageBox.Icon.Information)
         message_box.setWindowTitle("Notification")
         message_box.setText("Application will quit to apply changes.")
         message_box.exec()
 
-        self.parent.close()
-
     def actionButton(self):
         save_btn = QPushButton()
         save_btn.setText("Save")
-        save_btn.clicked.connect(lambda: self._saveValue())
+        save_btn.clicked.connect(lambda: self.saveValue())
 
         reset_btn = QPushButton()
         reset_btn.setText("Reset")
 
-        # def restart_thread():
-        #     self.camera_layout.stop_without_exit()
-        #     self.camera_layout.start()
-
-        # restart_btn = QPushButton()
-        # restart_btn.setText("Restart")
-        # restart_btn.clicked.connect(lambda: restart_thread())
-
         self.top_vbox.addWidget(save_btn)
         self.top_vbox.addWidget(reset_btn)
-        # self.top_vbox.addWidget(restart_btn)
 
     def show(self):
+        """
+        This method generates the parameter form and action buttons on the GUI.
+
+        It first calls the `generator` method to create the form for each parameter defined in the PARAMETERS dictionary.
+        Then it calls the `actionButton` method to create the 'Save' and 'Reset' buttons.
+
+        This method does not return anything.
+        """
         self.generator()
         self.actionButton()
 
     def generator(self):
+        """
+        This method generates the form for each parameter defined in the PARAMETERS dictionary.
+
+        For each parameter, it checks the type of the parameter. If the type is 'spinbox', it creates a spinbox form with the specified minimum, maximum, and current value. If the type is 'dropdown', it creates a dropdown form with the specified items and current value. If the 'disabled' key is present and set to True, the form is disabled.
+
+        The generated form and its corresponding label are then stored as attributes of the ParameterLayout object, with the key of the parameter appended with '_form' and '_label' respectively.
+
+        This method does not return anything.
+        """
+
         for key, value in PARAMETERS.items():
             if value["type"] == "spinbox":
                 label = self.label(value["label"])

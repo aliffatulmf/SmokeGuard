@@ -59,6 +59,3 @@ class Logger:
 
     def print(self, message: str, **kwargs):
         self.console.print(message, **kwargs)
-
-
-console = Logger()

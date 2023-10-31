@@ -1,5 +1,4 @@
 import datetime
-import logging
 import time
 
 import cv2
@@ -8,8 +7,9 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 from classtype import ImageType
-from config.model import ModelConfig
-from lib.log import *
+from config.parameter import ConfigManager
+from lib.hardware import get_device
+from lib.logger import console
 from utility.color import color_label
 
 
@@ -22,111 +22,157 @@ class CameraThread(QThread):
     # TODO: DETECTION SIGNAL
     PixmapSignal = Signal(QPixmap)
 
-    def __init__(self, parent):
-        super().__init__(parent)
+    def __init__(self, **kwargs):
+        super().__init__()
 
-        log_info("Starting Camera Thread")
-        self.model_config = ModelConfig()
+        self.kwargs = kwargs
+        self.model_name = self.kwargs.get("model")
+        self.quiet = self.kwargs.get("quiet")
+        self.config_manager = ConfigManager()
         self.stop_requested = False
 
-    def stopThread(self, safe: bool = True, exit: bool = True):
+    def stopThread(self, safe: bool = True):
         try:
             self.stop_requested = True
-            log_info("Trying to stop the thread")
+            if safe:
+                while self.isRunning():
+                    time.sleep(0.1)
 
-            if exit:
-                if safe:
-                    while self.isRunning():
-                        time.sleep(0.1)
-
-                    self.quit()
-                    self.wait()
-                    log_info("Thread stopped successfully")
-                else:
-                    log_warning("Forcefully terminating the thread")
-                    self.setTerminationEnabled(True)
-                    self.terminate()
+                self.quit()
+                self.wait()
+                console.success("Thread stopped successfully")
+            else:
+                console.warning("Forcefully terminating the thread")
+                self.setTerminationEnabled(True)
+                self.terminate()
         except Exception as e:
-            logging.error(f"Error occurred while stopping the thread: {e}")
+            console.fatal(f"Error occurred while stopping the thread: {e}")
 
     def run(self):
-        cap = self.open_camera()
-        model = self.load_model()
+        try:
+            cap = self.open_camera()
+            model = self.load_and_initialise_model()
 
-        log_success("Starting detection")
-        while cap.isOpened() and not self.stop_requested:
-            ret, frame = cap.read()
-            if ret:
-                predict = model(frame, size=1920)
-                self.draw_predictions(frame, predict)
+            if not self.quiet:
+                console.info("Starting detection")
 
-        cap.release()
+            self.process_frames(cap, model)
+        finally:
+            cap.release()
 
-    def load_model(self):
-        log_info("Model loading")
+    def load_and_initialise_model(self):
+        loaded_model = self.load_torch_model()
+        model_param = self.set_model_parameters(loaded_model)
+        return self.transfer_model_to_device(model_param, self.kwargs.get("device"))
 
-        model = torch.hub.load(
+    def process_frames(self, video_capture, model):
+        while video_capture.isOpened() and not self.stop_requested:
+            frame_exists, frame = video_capture.read()
+            if frame_exists:
+                prediction = model(frame, size=1280)
+                self.draw_predictions(frame, prediction)
+
+    def load_torch_model(self):
+        return torch.hub.load(
             "cache/yolov5",
             "custom",
-            path="weights/model.pt",
+            path=str(self.model_name),
             source="local",
             trust_repo=True,
+            verbose=False,
         )
-        log_info("Model loaded successfully")
 
-        model.conf = self.model_config.confidence_threshold
-        model.iou = self.model_config.iou_threshold
-        model.agnostic_nms = self.model_config.use_agnostic_nms
-        model.augment = self.model_config.enable_augmentation
+    def set_model_parameters(self, detection_model):
+        config_getter = self.config_manager.get
+        confidence_threshold = config_getter("confidence_threshold") / 100
+        intersection_over_union_threshold = config_getter("iou_threshold") / 100
+        agnostic_nms = config_getter("use_agnostic_nms")
+        enable_augmentation = config_getter("enable_augmentation")
 
-        log_info("Checking for GPU availability")
-        if torch.cuda.is_available():
-            log_success("GPU found. Moving model to GPU")
-            model.cuda()
+        (
+            detection_model.conf,
+            detection_model.iou,
+            detection_model.agnostic_nms,
+            detection_model.augment,
+        ) = (
+            confidence_threshold,
+            intersection_over_union_threshold,
+            agnostic_nms,
+            enable_augmentation,
+        )
+        return detection_model
+
+    def transfer_model_to_device(self, model, device):
+        if device == "cpu":
+            model.to(device)
+            console.info("Transferring model to CPU")
         else:
-            log_warning("GPU not found. Moving model to CPU")
-            model.cpu()
-
+            console.info("Verifying GPU resources ...")
+            try:
+                model.to(get_device(verbose=not self.quiet))
+                console.info("Transferring model to GPU")
+            except Exception as e:
+                console.warning(f"Unable to transfer model to GPU due to error: {e}")
+                console.info("Transferring model to CPU")
+                model.to("cpu")
         return model
 
-    @staticmethod
-    def open_camera():
-        log_info("Opening camera")
+    def open_camera(self):
         return cv2.VideoCapture(0)
 
     def draw_predictions(self, input_frame, predictions):
         rgb_frame = cv2.cvtColor(input_frame, cv2.COLOR_BGR2RGB)
-
         frame_height, frame_width, _ = rgb_frame.shape
         bytes_per_line = 3 * frame_width
 
         for prediction_frame in predictions.pandas().xyxy:
-            for detection in prediction_frame.to_numpy():
-                x_min, y_min, x_max, y_max, confidence, _, detected_object = detection
-                x_min, y_min, x_max, y_max = map(int, [x_min, y_min, x_max, y_max])
-                confidence = round(confidence, 2)
+            self.process_prediction_frame(
+                prediction_frame, rgb_frame, frame_width, frame_height, bytes_per_line
+            )
 
-                self.draw_label(
-                    rgb_frame, x_min, y_min, x_max, y_max, detected_object, confidence
-                )
+        self.emit_final_image(rgb_frame, frame_width, frame_height, bytes_per_line)
 
-                image = QImage(
-                    rgb_frame.data,
-                    frame_width,
-                    frame_height,
-                    bytes_per_line,
-                    QImage.Format.Format_RGB888,
-                )
-                image_type = ImageType(
-                    image=image,
-                    name=detected_object,
-                    confidence=confidence,
-                    timestamp=datetime.datetime.now().__str__(),
-                )
+    def process_prediction_frame(
+        self, prediction_frame, rgb_frame, frame_width, frame_height, bytes_per_line
+    ):
+        for detection in prediction_frame.to_numpy():
+            self.process_detection(
+                detection, rgb_frame, frame_width, frame_height, bytes_per_line
+            )
 
-                self.ImageTypeSignal.emit(image_type)
-                self.PixmapSignal.emit(QPixmap.fromImage(image))
+    def process_detection(
+        self, detection, rgb_frame, frame_width, frame_height, bytes_per_line
+    ):
+        x_min, y_min, x_max, y_max, confidence, _, detected_object = detection
+        x_min, y_min, x_max, y_max = map(int, [x_min, y_min, x_max, y_max])
+        confidence = round(confidence, 2)
 
+        # README my own fault not changing the label during training :)
+        if detected_object == "smoking":
+            detected_object = "rokok"
+
+        self.draw_label(
+            rgb_frame, x_min, y_min, x_max, y_max, detected_object, confidence
+        )
+
+        image = QImage(
+            rgb_frame.data,
+            frame_width,
+            frame_height,
+            bytes_per_line,
+            QImage.Format.Format_RGB888,
+        )
+        image_type = ImageType(
+            image=image,
+            name=detected_object,
+            confidence=confidence,
+            timestamp=datetime.datetime.now().__str__(),
+        )
+
+        self.ImageTypeSignal.emit(image_type)
+        self.PixmapSignal.emit(QPixmap.fromImage(image))
+
+    def emit_final_image(self, rgb_frame, frame_width, frame_height, bytes_per_line):
         final_image = QImage(
             rgb_frame.data,
             frame_width,
