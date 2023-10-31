@@ -26,8 +26,12 @@ def preprocess(args: argparse.Namespace):
     if not os.path.exists(args.model):
         console.fatal(f"Model file {args.model} not found")
 
+    if os.path.splitext(args.model)[1] != ".pt":
+        console.fatal(f"Only PyTorch model files are supported")
+
     if args.clean:
         remove_cache(args.exclude if args.exclude else [])
+        return False
 
     inet = INet()
 
@@ -38,6 +42,8 @@ def preprocess(args: argparse.Namespace):
             reinstall=getattr(args, "reinstall", False),
             names=args.install if args.install else None,
         )
+        return False
+    return True
 
 
 def run(**kwargs):

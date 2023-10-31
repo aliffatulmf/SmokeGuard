@@ -5,10 +5,10 @@
         640,
         640
     ],
-    "confidence_threshold": 60,
+    "confidence_threshold": 42,
     "iou_threshold": 45,
     "use_agnostic_nms": true,
-    "enable_augmentation": false,
+    "enable_augmentation": true,
     "hide_labels_enabled": false,
     "hide_confidence_enabled": false,
     "line_thickness_value": 2,

@@ -1,6 +1,5 @@
 import argparse
 import logging
-import socket
 
 from lib.entry import preprocess, run
 from lib.log import Logger
@@ -16,20 +15,9 @@ HEADER = """
 
 
 console = Logger()
-# disable global logging
-logging.disable()
 
 
-def is_online() -> bool:
-    try:
-        socket.create_connection(("1.1.1.1", 443), 2)
-        return True
-    except OSError as err:
-        console.fatal(f"Error: {err}")
-        return False
-
-
-def define_argument_parser():
+def command_arguments():
     parser = argparse.ArgumentParser(
         prog="control_panel.py", description="Control Panel for SmokeGuard"
     )
@@ -103,9 +91,11 @@ def define_argument_parser():
 
 
 if __name__ == "__main__":
+    # Turn off the global logging
+    logging.disable()
     console.print(HEADER, style="cyan", justify="center")
 
-    args = define_argument_parser()
-    kwargs = vars(args)
-    preprocess(args)
-    run(**kwargs)
+    cmd_args = command_arguments()
+    args_dict = vars(cmd_args)
+    if preprocess(cmd_args):
+        run(**args_dict)
