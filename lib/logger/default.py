@@ -1,11 +1,6 @@
 from rich.console import Console
 
-FATAL = "fatal"
-ERROR = "error"
-WARNING = "warning"
-INFO = "info"
-SUCCESS = "success"
-DEBUG = "debug"
+from lib.logger.level import *
 
 
 class Logger:
