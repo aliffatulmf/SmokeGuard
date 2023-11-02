@@ -108,4 +108,4 @@ class CameraLayout(QWidget):
             raise ThreadInactiveError
         else:
             if self.ct != None:
-                self.ct.stopThread()
+                self.ct.stop_thread()

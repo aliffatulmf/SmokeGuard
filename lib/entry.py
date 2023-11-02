@@ -1,5 +1,3 @@
-import argparse
-import os
 import platform as pf
 import struct
 import sys
@@ -8,9 +6,6 @@ import cv2
 from PySide6.QtWidgets import QApplication
 
 from gui.window import Window
-from lib.cache import remove_cache
-from lib.connection.internet import INet
-from lib.dependency import install_requirements
 from lib.logger import console
 
 
@@ -20,30 +15,6 @@ def is_win10_64bit_os() -> bool:
         and pf.release() == "10"
         and struct.calcsize("P") * 8 == 64
     )
-
-
-def preprocess(args: argparse.Namespace):
-    if not os.path.exists(args.model):
-        console.fatal(f"Model file {args.model} not found")
-
-    if os.path.splitext(args.model)[1] != ".pt":
-        console.fatal(f"Only PyTorch model files are supported")
-
-    if args.clean:
-        remove_cache(args.exclude if args.exclude else [])
-        return False
-
-    inet = INet()
-
-    if args.install_required or args.install:
-        if not inet.is_online():
-            console.fatal("You are not connected to the internet.")
-        install_requirements(
-            reinstall=getattr(args, "reinstall", False),
-            names=args.install if args.install else None,
-        )
-        return False
-    return True
 
 
 def run(**kwargs):

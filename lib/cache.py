@@ -1,9 +1,7 @@
 import os
 import shutil
 
-from rich.console import Console
-
-console = Console()
+from lib.logger import console
 
 
 def remove_cache(excluded_directory: list[str] = [], verbose: bool = False) -> None:
@@ -15,10 +13,9 @@ def remove_cache(excluded_directory: list[str] = [], verbose: bool = False) -> N
 
                 try:
                     shutil.rmtree(root)
-                    if verbose:
-                        console.print(
-                            f"[bold red][REMOVE][/bold red][italic red] {os.path.dirname(root)}[/italic red]"
-                        )
+                    console.print(
+                        f"[bold red][REMOVE][/bold red][italic red] {os.path.dirname(root)}[/italic red]"
+                    )
                 except Exception as e:
                     print(f"Error occurred while removing cache: {e}")
             elif verbose:

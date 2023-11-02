@@ -1,4 +1,5 @@
 import PySide6
+import torch
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QMessageBox
 
@@ -16,6 +17,7 @@ def about_notification_box():
         Author: {APP_AUTHOR}
         Website: {APP_WEBSITE}
         PySide version: {APP_PYSIDE_VERSION}
+        CUDA support: {'Yes' if torch.cuda.is_available() else 'No'}
         """
     about = QMessageBox()
     about.setWindowIcon(QIcon("assets/icon/icon.png"))

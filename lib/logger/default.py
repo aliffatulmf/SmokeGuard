@@ -35,9 +35,10 @@ class Logger:
         kwstr = " ".join(f"{k}={v}" for k, v in kwargs.items())
         self.console.log(f"{self.logColorLevel(level)} {message} {kwstr}")
 
-    def fatal(self, message: str, **kwargs):
+    def fatal(self, message: str, stop: bool = True, **kwargs):
         self.log(message, FATAL, **kwargs)
-        exit(1)
+        if stop:
+            exit(1)
 
     def error(self, message: str, **kwargs):
         self.log(message, ERROR, **kwargs)

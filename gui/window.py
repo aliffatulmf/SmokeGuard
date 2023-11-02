@@ -1,8 +1,8 @@
 import os
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QCloseEvent, QIcon, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QMenuBar
+from PySide6.QtGui import QCloseEvent, QIcon
+from PySide6.QtWidgets import QMainWindow, QMenuBar, QMessageBox
 
 from gui import proxy
 from gui.layout.camera import CameraLayout
@@ -28,39 +28,28 @@ class Window(QMainWindow):
         self.set_application_background(Qt.GlobalColor.white)
 
     def setup_functions(self):
-        self.mainCameraThread = CameraThread(**self.kwargs)
-        self.snapshotWindow = SnapshotWindow()
-        cameraLayout = self.loadCameraLayout(self.snapshotWindow)
-        self.parameterLayout = self.load_parameter_layout(cameraLayout)
+        self.camera_thread = CameraThread(**self.kwargs)
+        self.snapshot_window = SnapshotWindow()
+        camera_layout = self.load_camera_layout(self.snapshot_window)
+        self.parameter_layout = self.load_parameter_layout(camera_layout)
 
     def setup_menubar(self) -> None:
-        menuLayout: QMenuBar = QMenuBar(self)
-        menuLayout.setFixedWidth(300)
+        menu_layout: QMenuBar = QMenuBar(self)
+        menu_layout.setMinimumWidth(1360)
+        menu_layout.addAction("Snapshots", self.snapshot_window.show)
+        menu_layout.addAction("About", about_notification_box)
 
-        fileMenu = menuLayout.addMenu("File")
-        fileMenu.addAction("Quit", self.exit_application, QKeySequence("Ctrl+Q"))
-
-        viewMenu = menuLayout.addMenu("View")
-        viewMenu.addAction("Snapshots", self.snapshotWindow.show)
-
-        helpMenu = menuLayout.addMenu("Help")
-        helpMenu.addAction("About", about_notification_box)
-
-    def exit_application(self) -> None:
-        self.safe_stop_camera()
-        self.close()
-
-    def loadCameraLayout(self, snapshot_window: SnapshotWindow) -> CameraLayout:
+    def load_camera_layout(self, snapshot_window: SnapshotWindow) -> CameraLayout:
         cameraLayout = CameraLayout(
             self,
-            self.mainCameraThread,
+            self.camera_thread,
             **self.kwargs,
         )
 
-        if not self.mainCameraThread.isRunning():
+        if not self.camera_thread.isRunning():
             cameraLayout.init()
             proxy.better_proxy(
-                self.mainCameraThread.ImageTypeSignal, snapshot_window.slot_image
+                self.camera_thread.ImageTypeSignal, snapshot_window.slot_image
             )
             cameraLayout.start()
 
@@ -89,21 +78,29 @@ class Window(QMainWindow):
         palette.setColor(self.backgroundRole(), color)
         self.setPalette(palette)
 
+    def exit_application(self) -> None:
+        if getattr(self, "snapshot_window", None) and self.snapshot_window.isVisible():
+            self.safe_stop_camera()
+            self.snapshot_window.close()
+
     def safe_stop_camera(self) -> None:
-        if self.mainCameraThread.isRunning():
-            self.mainCameraThread.stopThread()
+        if self.camera_thread.isRunning():
+            self.camera_thread.stop_thread()
+
+    def confirm_close_popup(self):
+        return QMessageBox.question(
+            self,
+            "Confirm Close",
+            "Are you sure you want to exit SmokeGuard?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
 
     def closeEvent(self, event: QCloseEvent):
-        # confirm_before_exit = QMessageBox.question(
-        #     self,
-        #     "Confirm Close",
-        #     "Are you sure you want to exit SmokeGuard?",
-        #     QMessageBox.Yes | QMessageBox.No,
-        # )
+        if self.confirm_close_popup() == QMessageBox.Yes:
+            if self.camera_thread.isRunning():
+                self.camera_thread.stop_thread()
 
-        # if confirm_before_exit == QMessageBox.Yes:
-        if hasattr(self, "snapshotWindow") and self.snapshotWindow.isVisible():
-            self.snapshotWindow.close()
-
-        self.exit_application()
-        super().closeEvent(event)
+            if self.snapshot_window.close():
+                event.accept()
+        else:
+            event.ignore()

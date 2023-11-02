@@ -31,7 +31,7 @@ class CameraThread(QThread):
         self.config_manager = ConfigManager()
         self.stop_requested = False
 
-    def stopThread(self, safe: bool = True):
+    def stop_thread(self, safe: bool = True):
         try:
             self.stop_requested = True
             if safe:
@@ -69,7 +69,7 @@ class CameraThread(QThread):
         while video_capture.isOpened() and not self.stop_requested:
             frame_exists, frame = video_capture.read()
             if frame_exists:
-                prediction = model(frame, size=1280)
+                prediction = model(frame, size=768)
                 self.draw_predictions(frame, prediction)
 
     def load_torch_model(self):
