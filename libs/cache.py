@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from lib.logger import console
+from libs.logger import console
 
 
 def remove_cache(excluded_directory: list[str] = [], verbose: bool = False) -> None:

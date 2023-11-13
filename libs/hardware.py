@@ -1,6 +1,6 @@
 import torch
 
-from lib.logger import console
+from libs.logger import console
 
 
 def get_device(verbose: bool = False):

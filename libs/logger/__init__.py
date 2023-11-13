@@ -1,4 +1,4 @@
-from lib.logger.default import Logger
+from libs.logger.default import Logger
 
 
 class VerboseLogger(Logger):

@@ -2,8 +2,8 @@ import pkgutil
 import subprocess
 import sys
 
-from lib.logger import VerboseLogger, console
-from lib.logger.level import *
+from libs.logger import VerboseLogger, console
+from libs.logger.level import *
 
 PIP_PACKAGES = [
     "gitpython>=3.1.30",

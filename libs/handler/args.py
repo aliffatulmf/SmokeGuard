@@ -1,13 +1,12 @@
 import argparse
 import os
 
-from rich.table import Table
-
-from lib.cache import remove_cache
-from lib.connection.internet import INet
-from lib.dependency import install_requirements
-from lib.logger import console
-from lib.validation.model import SUPPORTED_FORMATS, validation_model_file
+from libs.cache import remove_cache
+from libs.connection.internet import INet
+from libs.dependency import install_requirements
+from libs.logger import console
+from libs.requirements.packages import check_requirements
+from libs.validation.model import SUPPORTED_FORMATS, validation_model_file
 
 
 class ArgumentHandler:
@@ -57,7 +56,10 @@ class ArgumentHandler:
 
     def show_supported_formats(self):
         # Use a table to display the supported formats
-        table = Table(title="Supported Formats")
+        check_requirements(["rich"])
+        import rich
+
+        table = rich.Table(title="Supported Formats")
         table.add_column("Format", justify="center", style="cyan")
         table.add_column("Model", justify="center", style="cyan")
         for format in SUPPORTED_FORMATS:

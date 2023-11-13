@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QFrame, QGroupBox, QLabel, QVBoxLayout, QWidget
 
-from lib.log import *
+from libs.log import *
 from threads.camera import CameraThread
 
 
@@ -25,7 +25,7 @@ class CameraLayout(QWidget):
         self.kwargs = kwargs
         self.console = Logger()
         self.parent: QWidget = parent
-        self.ct = camera_thread
+        self.camera_thread = camera_thread
 
         self.setup_ui()
 
@@ -66,7 +66,7 @@ class CameraLayout(QWidget):
         self.vbox.setParent(self.groupbox)
 
     def show(self):
-        if not self.ct:
+        if not self.camera_thread:
             raise InactiveThreadError("Thread is not running")
 
         self.video.setParent(self.groupbox)
@@ -75,16 +75,17 @@ class CameraLayout(QWidget):
         return self.groupbox
 
     def init(self):
-        self.ct.ImageSignal.connect(self.frame_signal)
+        # self.camera_thread.ImageSignal.connect(self.frame_signal)
+        self.camera_thread.ImageSignal.connect(self.slot_image)
 
     @Slot(QImage)
-    def frame_signal(self, image: QImage):
+    def slot_image(self, image: QImage):
         pixmap = QPixmap.fromImage(image)
         self.video.setPixmap(pixmap)
 
     def is_running(self):
-        if self.ct:
-            return self.ct.isRunning()
+        if self.camera_thread:
+            return self.camera_thread.isRunning()
         return False
 
     def restart(self):
@@ -94,18 +95,20 @@ class CameraLayout(QWidget):
             self.start()
 
     def signal(self):
-        if not self.ct:
+        if not self.camera_thread:
             raise ThreadInactiveError
-        return self.ct.ImageTypeSignal
+        return self.camera_thread.ImageTypeSignal
 
     def start(self):
-        if self.ct:
-            self.ct.finished.connect(self.ct.deleteLater)
-            self.ct.start()
+        """Starts the camera thread."""
+        self.camera_thread.start()
+        # if self.ct:
+        #     self.ct.finished.connect(self.ct.deleteLater)
+        #     self.ct.start()
 
     def safe_stop(self):
         if not self.is_running():
             raise ThreadInactiveError
         else:
-            if self.ct != None:
-                self.ct.stop_thread()
+            if self.camera_thread != None:
+                self.camera_thread.stop_thread()

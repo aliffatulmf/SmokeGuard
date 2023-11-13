@@ -1,13 +1,15 @@
-from rich.console import Console
-
-from lib.logger.level import *
+from libs.logger.level import *
+from libs.requirements.packages import check_requirements
 
 
 class Logger:
     def __init__(self):
-        self.console = Console()
+        check_requirements(["rich"])
+        from rich.console import Console
 
-    def logColorLevel(self, level: str) -> str:
+        self.console = Console(log_path=False)
+
+    def log_color_level(self, level: str) -> str:
         if level == FATAL:
             return "[bold red][FATAL][/bold red]"
         elif level == ERROR:
@@ -28,7 +30,7 @@ class Logger:
 
     def log(self, message: str, level: str, **kwargs):
         kwstr = " ".join(f"{k}={v}" for k, v in kwargs.items())
-        self.console.log(f"{self.logColorLevel(level)} {message} {kwstr}")
+        self.console.log(f"{self.log_color_level(level)} {message} {kwstr}")
 
     def fatal(self, message: str, stop: bool = True, **kwargs):
         self.log(message, FATAL, **kwargs)

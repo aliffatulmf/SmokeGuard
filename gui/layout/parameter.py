@@ -62,7 +62,7 @@ PARAMETERS = {
 }
 
 
-class ParameterLayout:
+class ConfigLayout:
     def __init__(self, parent: QWidget = None):
         self.parent = parent
 

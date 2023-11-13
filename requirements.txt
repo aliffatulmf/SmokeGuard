@@ -17,3 +17,4 @@ onnx-simplifier
 onnxruntime
 setuptools
 PySide6
+dill

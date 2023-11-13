@@ -1,6 +1,6 @@
 import socket
 
-from lib.logger.default import *
+from libs.logger.default import *
 
 
 class INet:

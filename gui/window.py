@@ -4,11 +4,11 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import QMainWindow, QMenuBar, QMessageBox
 
-from gui import proxy
 from gui.layout.camera import CameraLayout
-from gui.layout.parameter import ParameterLayout
+from gui.layout.parameter import ConfigLayout
 from gui.snapshot import SnapshotWindow
 from gui.vars import APP_NAME, about_notification_box
+from libs.logger import console
 from threads.camera import CameraThread
 
 
@@ -16,10 +16,22 @@ class Window(QMainWindow):
     def __init__(self, **kwargs) -> None:
         super().__init__()
 
+        ConfigLayout(self).show()
+
         self.kwargs = kwargs
+
+        self.camera_thread = CameraThread(**self.kwargs)
+
         self.setup_functions()
         self.setup_ui()
         self.setup_menubar()
+
+        if hasattr(self, "camera_thread"):
+            self.camera_thread.ImageSignal.connect(self.camera_layout.slot_image)
+            self.camera_thread.SnapshotSignal.connect(self.snapshot_window.slot_image)
+            self.camera_thread.start()
+        else:
+            console.fatal("Camera thread not found.")
 
     def setup_ui(self) -> None:
         self.setFixedSize(1360, 768)
@@ -28,38 +40,14 @@ class Window(QMainWindow):
         self.set_application_background(Qt.GlobalColor.white)
 
     def setup_functions(self):
-        self.camera_thread = CameraThread(**self.kwargs)
         self.snapshot_window = SnapshotWindow()
-        camera_layout = self.load_camera_layout(self.snapshot_window)
-        self.parameter_layout = self.load_parameter_layout(camera_layout)
+        self.camera_layout = CameraLayout(self, self.camera_thread, **self.kwargs)
 
     def setup_menubar(self) -> None:
         menu_layout: QMenuBar = QMenuBar(self)
         menu_layout.setMinimumWidth(1360)
         menu_layout.addAction("Snapshots", self.snapshot_window.show)
         menu_layout.addAction("About", about_notification_box)
-
-    def load_camera_layout(self, snapshot_window: SnapshotWindow) -> CameraLayout:
-        cameraLayout = CameraLayout(
-            self,
-            self.camera_thread,
-            **self.kwargs,
-        )
-
-        if not self.camera_thread.isRunning():
-            cameraLayout.init()
-            proxy.better_proxy(
-                self.camera_thread.ImageTypeSignal, snapshot_window.slot_image
-            )
-            cameraLayout.start()
-
-    def load_parameter_layout(self, camera: CameraLayout) -> ParameterLayout:
-        """
-        Initializes the parameter layout.
-        """
-        parameter_layout: ParameterLayout = ParameterLayout(self)
-        parameter_layout.show()
-        return parameter_layout
 
     def set_application_icon(self, icon: str) -> None:
         """
@@ -96,11 +84,11 @@ class Window(QMainWindow):
         )
 
     def closeEvent(self, event: QCloseEvent):
-        if self.confirm_close_popup() == QMessageBox.Yes:
-            if self.camera_thread.isRunning():
-                self.camera_thread.stop_thread()
-
-            if self.snapshot_window.close():
-                event.accept()
+        if (
+            self.confirm_close_popup() == QMessageBox.Yes
+            and self.snapshot_window.close()
+            and self.camera_thread.stop_thread()
+        ):
+            event.accept()
         else:
             event.ignore()
