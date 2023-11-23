@@ -36,7 +36,7 @@ class Module:
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
             console.log(f"[bold red][ERROR][/bold red] {e}")
-            exit(1)
+            sys.exit(1)
 
     def pip_command(self, packages: list[str], reinstall: bool = False):
         cmd = [sys.executable, "-m", "pip", "install", "--quiet"]

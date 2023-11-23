@@ -261,7 +261,7 @@ class CameraThread(QThread):
             console.fatal(f"Error occurred while stopping the thread: {e}")
 
     def run(self) -> None:
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(self.kwargs.get("source"))
         model = torch.hub.load(
             "cache/yolov5",
             "custom",

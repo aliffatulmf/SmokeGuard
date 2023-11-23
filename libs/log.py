@@ -1,3 +1,5 @@
+import sys
+
 from rich.console import Console
 
 FATAL = "fatal"
@@ -37,7 +39,7 @@ class Logger:
 
     def fatal(self, message: str, **kwargs):
         self.log(message, FATAL, **kwargs)
-        exit(1)
+        sys.exit(1)
 
     def error(self, message: str, **kwargs):
         self.log(message, ERROR, **kwargs)

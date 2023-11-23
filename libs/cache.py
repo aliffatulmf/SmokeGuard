@@ -4,22 +4,35 @@ import shutil
 from libs.logger import console
 
 
+class CacheError(Exception):
+    pass
+
+
+def is_excluded(root: str, excluded_directory: list[str]):
+    return any(exclude for exclude in excluded_directory if exclude in root)
+
+
 def remove_cache(excluded_directory: list[str] = [], verbose: bool = False) -> None:
     cache_found = False
+    print(excluded_directory)
     for root, _, _ in os.walk("."):
-        if root.endswith("__pycache__"):
-            if not any([ed for ed in excluded_directory if ed in root]):
-                cache_found = True
+        dirname = os.path.dirname(root)
+        success_message = (
+            f"[bold red][REMOVE][/bold red][italic red] {dirname}[/italic red]"
+        )
+        skip_message = f"[bold cyan][SKIP][/bold cyan] {dirname}"
 
+        if root.endswith("__pycache__"):
+            cache_found = True
+
+            if not is_excluded(root, excluded_directory):
                 try:
                     shutil.rmtree(root)
-                    console.print(
-                        f"[bold red][REMOVE][/bold red][italic red] {os.path.dirname(root)}[/italic red]"
-                    )
                 except Exception as e:
-                    print(f"Error occurred while removing cache: {e}")
-            elif verbose:
-                console.print(f"[bold cyan][SKIP][/bold cyan] {os.path.dirname(root)}")
+                    raise CacheError(f"Error occurred while removing cache: {e}")
+                console.print(success_message)
+            else:
+                console.print(skip_message)
 
     if cache_found:
         console.print("[bold green][SUCCESS][/bold green] Successfully removed cache")

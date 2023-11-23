@@ -1,8 +1,8 @@
 import logging
 from cmd.args import CommandArguments
 
-from libs.exec import run
-from libs.handler.args import ArgumentHandler
+from libs.handler.command_handler import command_handlers
+from libs.handler.command_validation import command_validation
 from libs.logger import console
 
 HEADER = """
@@ -17,11 +17,10 @@ HEADER = """
 if __name__ == "__main__":
     console.print(HEADER, style="cyan", justify="center")
 
-    # Turn off the global logging
     logging.disable()
 
     cmd_args = CommandArguments().parse()
+    cmd_kwargs = vars(cmd_args)
 
-    handler = ArgumentHandler(cmd_args)
-    if handler.process():
-        run(**vars(cmd_args))
+    if bool(command_validation(**cmd_kwargs)):
+        command_handlers(**cmd_kwargs)

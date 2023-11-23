@@ -1,3 +1,6 @@
+import sys
+from typing import Any
+
 from libs.logger.level import *
 from libs.requirements.packages import check_requirements
 
@@ -35,7 +38,7 @@ class Logger:
     def fatal(self, message: str, stop: bool = True, **kwargs):
         self.log(message, FATAL, **kwargs)
         if stop:
-            exit(1)
+            sys.exit(1)
 
     def error(self, message: str, **kwargs):
         self.log(message, ERROR, **kwargs)
@@ -52,8 +55,10 @@ class Logger:
     def debug(self, message: str, **kwargs):
         self.log(message, DEBUG, **kwargs)
 
-    def custom(self, message: str, header: str, **kwargs):
-        self.console.log(f"[bold blue][{header}][/bold blue] {message}", **kwargs)
+    def custom(self, header_color: str, header: str, message: str, **kwargs):
+        self.console.log(
+            f"[bold {header_color}][{header}][/bold {header_color}] {message}", **kwargs
+        )
 
-    def print(self, message: str, **kwargs):
+    def print(self, message: Any, **kwargs):
         self.console.print(message, **kwargs)

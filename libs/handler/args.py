@@ -1,68 +1,53 @@
-import argparse
-import os
+import sys
 
-from libs.cache import remove_cache
-from libs.connection.internet import INet
-from libs.dependency import install_requirements
 from libs.logger import console
-from libs.requirements.packages import check_requirements
-from libs.validation.model import SUPPORTED_FORMATS, validation_model_file
 
 
-class ArgumentHandler:
-    def __init__(self, args: argparse.Namespace):
-        self.args = args
-        self.inet = INet()
+class ArgumentRequired:
+    def __init__(self, **kwargs):
+        self.arguments = kwargs
 
-    def process(self):
-        # Check the internet connection first
-        if not self.inet.is_online():
-            console.fatal("You are not connected to the internet.")
+    def _args_required(self):
+        if self.command_name in self.arguments:
+            for link in self.linked:
+                value = self.arguments.get(link)
 
-        # Handle the install arguments
-        if self.args.install_required or self.args.install:
-            install_requirements(
-                reinstall=getattr(self.args, "reinstall", False),
-                names=self.args.install if self.args.install else None,
-            )
-            return False
+                if value is not None:
+                    value = int(value) if value.isdigit() else str(value)
 
-        # Handle the supported formats argument
-        if self.args.supported_formats:
-            self.show_supported_formats()
-            return False
+                if (
+                    hasattr(self, "ignore")
+                    and link in self.ignore.keys()
+                    and value in self.ignore.values()
+                ):
+                    continue
 
-        # Handle the clean argument
-        if self.args.clean:
-            remove_cache(self.args.exclude if self.args.exclude else [])
-            return False
+                if not value:
+                    raise ValueError(
+                        f"the [bold green]--{self.command_name}[/bold green] requires [bold green]--{link}[/bold green] to execute"
+                    )
 
-        # Handle the model argument
-        if not self.args.model:
-            console.fatal("Please specify the path to the model file")
+    @classmethod
+    def required(cls, command_name: str, linked: list[str], ignore: dict = {}):
+        if command_name == "" or command_name is None:
+            raise ValueError("command name cannot be empty")
+        else:
+            cls.command_name = command_name
 
-        if not os.path.exists(self.args.model):
-            console.fatal(f"Model file {self.args.model} not found")
+        if not linked:
+            raise ValueError("linked arguments cannot be empty")
+        else:
+            cls.linked = linked
 
-        if not validation_model_file(self.args.model):
-            console.fatal(
-                f"Model file {self.args.model} is not a valid model file. Renaming the file is not a good idea.",
-                stop=False,
-            )
-            self.show_supported_formats()
-            exit(1)
+        if bool(ignore):
+            cls.ignore = ignore
 
-        return True
+    def __enter__(self):
+        return self
 
-    def show_supported_formats(self):
-        # Use a table to display the supported formats
-        check_requirements(["rich"])
-        import rich
-
-        table = rich.Table(title="Supported Formats")
-        table.add_column("Format", justify="center", style="cyan")
-        table.add_column("Model", justify="center", style="cyan")
-        for format in SUPPORTED_FORMATS:
-            table.add_row(format[0], format[1])
-
-        console.print(table, justify="center")
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            self._args_required()
+        except ValueError as e:
+            console.custom("red", "CMD ERROR", str(e))
+            sys.exit(1)
