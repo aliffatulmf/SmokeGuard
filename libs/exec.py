@@ -50,7 +50,7 @@ def run(**kwargs):
     cv2.setLogLevel(0)
 
     source = kwargs.get("source")
-    source = check_camera(int(source)) if source.isdigit() else source
+    # source = check_camera(source) if source.isdigit() else source
 
     try:
         app = QApplication(sys.argv)

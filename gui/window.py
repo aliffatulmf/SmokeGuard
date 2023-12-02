@@ -12,6 +12,15 @@ from libs.logger import console
 from threads.camera import CameraThread
 
 
+def eod_notification_box():
+    return QMessageBox.information(
+        None,
+        "Thread",
+        "End Of Detection",
+        QMessageBox.Ok,
+    )
+
+
 class Window(QMainWindow):
     def __init__(self, **kwargs) -> None:
         super().__init__()
@@ -27,6 +36,13 @@ class Window(QMainWindow):
         self.setup_menubar()
 
         if hasattr(self, "camera_thread"):
+
+            def eod_handler(x: bool):
+                if x:
+                    eod_notification_box()
+                    self.close()
+
+            self.camera_thread.EOD.connect(lambda x: eod_handler(x))
             self.camera_thread.ImageSignal.connect(self.camera_layout.slot_image)
             self.camera_thread.SnapshotSignal.connect(self.snapshot_window.slot_image)
             self.camera_thread.start()
@@ -34,7 +50,7 @@ class Window(QMainWindow):
             console.fatal("Camera thread not found.")
 
     def setup_ui(self) -> None:
-        self.setFixedSize(1360, 768)
+        self.setFixedSize(1200, 690)
         self.set_application_icon("assets/icon/icon.png")
         self.setWindowTitle(APP_NAME)
         self.set_application_background(Qt.GlobalColor.white)

@@ -222,6 +222,9 @@ class CameraThread(QThread):
     # send image to snapshot window
     SnapshotSignal = Signal(ImageType)
 
+    # END OF DETECTION SIGNAL
+    EOD = Signal(bool)
+
     def __init__(self, **kwargs) -> None:
         super().__init__()
         self.kwargs = kwargs
@@ -309,8 +312,16 @@ class CameraThread(QThread):
                 )
 
                 self.draw_predictions(frame, prediction, qimage=qimage)
+            else:
+                # only emited if source is a video file
+                self.EOD.emit(True)
+                break
+
             self.ImageSignal.emit(qimage)
             # self.record.write(frame)
+
+        cap.release()
+        cv2.destroyAllWindows()
 
     def draw_predictions(
         self,
@@ -325,6 +336,9 @@ class CameraThread(QThread):
 
                 if detected_object == "smoking":
                     detected_object = "rokok"
+
+                # round confidence to 2 decimal places
+                confidence = round(confidence, 2)
 
                 self.draw_label(
                     frame, x_min, y_min, x_max, y_max, detected_object, confidence
