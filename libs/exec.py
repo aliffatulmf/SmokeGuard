@@ -24,15 +24,13 @@ def is_win10_64bit_os() -> bool:
     )
 
 
-def check_camera(source):
-    if source.isdigit():
-        console.info("Checking camera...")
-        cap = cv2.VideoCapture(source)
-        if not cap.isOpened():
-            console.fatal(
-                "Failed to open camera. Please check your camera and try again."
-            )
-        cap.release()
+def check_camera(source: int):
+    console.info("Checking camera...")
+    cap = cv2.VideoCapture(source)
+    if not cap.isOpened():
+        console.fatal("Failed to open camera. Please check your camera and try again.")
+    cap.release()
+    return source
 
 
 def run(**kwargs):
@@ -46,11 +44,11 @@ def run(**kwargs):
     except Exception as e:
         console.fatal(e)
 
-    # disable OpenCV logging
-    cv2.setLogLevel(0)
-
     source = kwargs.get("source")
-    # source = check_camera(source) if source.isdigit() else source
+    if source.isdigit():
+        cv2.setLogLevel(0)
+        source = check_camera(int(source))
+    kwargs["source"] = source
 
     try:
         app = QApplication(sys.argv)
