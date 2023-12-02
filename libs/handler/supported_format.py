@@ -2,7 +2,7 @@ from rich.table import Table
 
 from libs.logger import console
 from libs.requirements.packages import check_requirements
-from libs.validation.model import SUPPORTED_FORMATS
+from validation.model import SUPPORTED_FORMATS
 
 
 def show_supported_formats():

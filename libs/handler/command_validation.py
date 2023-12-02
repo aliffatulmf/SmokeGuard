@@ -3,7 +3,7 @@ import os
 from libs.cache import remove_cache
 from libs.connection.internet import is_online
 from libs.logger import console
-from libs.validation.model import validation_model_file
+from validation.model import validate_file_extension
 
 from .args import ArgumentRequired
 
@@ -32,7 +32,7 @@ def validate_model_arg(kwargs):
     if model_arg:
         if not os.path.isfile(str(model_arg)):
             console.fatal("Please specify the path of the model file")
-        elif not validation_model_file(model_arg):
+        elif not validate_file_extension(model_arg):
             console.fatal(f"Model file {model_arg} is not a valid model")
         return CONTINUE
 
