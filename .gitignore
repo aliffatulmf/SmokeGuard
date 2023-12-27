@@ -8,4 +8,4 @@ weights/*.onnx
 *.mp4
 
 cache/
-
+images/

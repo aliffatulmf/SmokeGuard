@@ -1,68 +1,58 @@
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QComboBox,
-    QFrame,
-    QGroupBox,
-    QLabel,
-    QMessageBox,
-    QPushButton,
-    QSpinBox,
-    QVBoxLayout,
-    QWidget,
-)
+import logging
 
-from config.parameter import ConfigManager
+import torch
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import (QComboBox, QFrame, QGroupBox, QLabel,
+                               QMessageBox, QPushButton, QSpinBox, QVBoxLayout,
+                               QWidget)
+
+from pkg.cfg import ConfigValues
+
+config = ConfigValues()
 
 ENABLE = "Enable"
 DISABLE = "Disable"
 SWITCH = [ENABLE, DISABLE]
 
-config_manager = ConfigManager()
-
 PARAMETERS = {
-    "confidence_threshold": {
+    "conf": {
         "type": "spinbox",
         "label": "Confidence Threshold",
         "minimum": 1,
         "maximum": 100,
-        "value": config_manager.get("confidence_threshold"),
+        "value": config.get("conf") * 100,
     },
-    "iou_threshold": {
+    "iou": {
         "type": "spinbox",
-        "label": "Overlap Threshold",
+        "label": "IoU Threshold",
         "minimum": 1,
         "maximum": 100,
-        "value": config_manager.get("iou_threshold"),
+        "value": config.get("iou") * 100,
     },
-    "automatic_mixed_precision": {
-        "type": "dropdown",
-        "label": "Automatic Mixed Precision",
-        "items": SWITCH,
-        "value": config_manager.get("automatic_mixed_precision"),
+    "hardware_acceleration": {
+        "type": "choice",
+        "label": "Hardware Acceleration",
+        "items": ["CPU", "CUDA"],
+        "value": "CUDA" if torch.cuda.is_available() else "CPU",
+        "disabled": True,
     },
-    # "hardware_acceleration": {
-    #     "type": "dropdown",
-    #     "label": "Hardware Acceleration",
-    #     "items": ["Automatic"],
-    #     "value": config_manager.get("device"),
-    #     "disabled": True,
-    # },
-    "use_agnostic_nms": {
+    "agnostic": {
         "type": "dropdown",
         "label": "Class-Agnostic NMS",
         "items": SWITCH,
-        "value": config_manager.get("use_agnostic_nms"),
+        "value": config.get("agnostic"),
     },
-    "enable_augmentation": {
+    "amp": {
         "type": "dropdown",
-        "label": "Data Augmentation",
+        "label": "Automatic Mixed Precision",
         "items": SWITCH,
-        "value": config_manager.get("enable_augmentation"),
+        "value": config.get("amp"),
     },
 }
 
 
-class ConfigLayout:
+class SettingsLayout:
     def __init__(self, parent: QWidget = None):
         self.parent = parent
 
@@ -70,121 +60,107 @@ class ConfigLayout:
         self.frame.setGeometry(20, 50, 200, 768)
         self.frame.setParent(parent)
 
-        self.top_groupbox = QGroupBox()
-        self.top_groupbox.setTitle("Parameters")
-        self.top_groupbox.setFixedWidth(190)
-        self.top_groupbox.setFixedHeight(400)
-        self.top_groupbox.setParent(self.frame)
+        self.param_box = QGroupBox()
+        self.param_box.setTitle("Parameters")
+        self.param_box.setFixedWidth(190)
+        self.param_box.setFixedHeight(400)
+        self.param_box.setParent(self.frame)
 
-        self.top_vbox = QVBoxLayout(self.top_groupbox)
+        self.top_vbox = QVBoxLayout(self.param_box)
         self.top_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-    def saveValue(self):
-        for key, value in PARAMETERS.items():
-            form_value = self.__dict__[f"{key}_form"]
-            if "disabled" not in value:
-                config_manager.set(
-                    key,
-                    form_value.value()
-                    if value["type"] == "spinbox"
-                    else form_value.currentText() == ENABLE,
-                )
+    def save_values(self):
+        values = {}
+        for k, v in PARAMETERS.items():
+            if v["type"] == "spinbox":
+                values[k] = self.__dict__[f"{k}_form"].value()
+            elif v["type"] == "dropdown":
+                values[k] = self.__dict__[f"{k}_form"].currentText()
 
-        config_manager.save()
-        self.saveNotificationBox()
-        self.parent.close()
+        config.update(values)
+        if config.save():
+            self.show_save_notif()
 
     @staticmethod
-    def saveNotificationBox():
+    def show_save_notif():
         message_box = QMessageBox()
-        message_box.setIcon(QMessageBox.Icon.Information)
-        message_box.setWindowTitle("Notification")
-        message_box.setText("Application will quit to apply changes.")
+        message_box.setWindowIcon(QIcon("assets/icon/icon.png"))
+        message_box.setWindowTitle("Save Notification")
+        message_box.setText(
+            "Your changes have been successfully saved.\nPlease restart the application for the changes to take effect.")
+        message_box.setStandardButtons(QMessageBox.Ok)
         message_box.exec()
 
-    def actionButton(self):
-        save_btn = QPushButton()
-        save_btn.setText("Save")
-        save_btn.clicked.connect(lambda: self.saveValue())
+    def create_action_buttons(self):
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(lambda: self.save_values())
 
-        reset_btn = QPushButton()
-        reset_btn.setText("Reset")
+        reset_btn = QPushButton("Reset")
+        reset_btn.clicked.connect(lambda: self.reset_values())
 
-        self.top_vbox.addWidget(save_btn)
-        self.top_vbox.addWidget(reset_btn)
+        self.param_box.layout().addWidget(save_btn)
+        self.param_box.layout().addWidget(reset_btn)
 
-    def show(self):
-        """
-        This method generates the parameter form and action buttons on the GUI.
+    def reset_values(self):
+        for k, v in PARAMETERS.items():
+            if v["type"] == "spinbox":
+                self.__dict__[f"{k}_form"].setValue(v["value"])
+            elif v["type"] == "dropdown":
+                self.__dict__[f"{k}_form"].setCurrentText(
+                    ENABLE if v["value"] else DISABLE)
+            elif v["type"] == "choice":
+                self.__dict__[f"{k}_form"].setCurrentText(v["value"])
 
-        It first calls the `generator` method to create the form for each parameter defined in the PARAMETERS dictionary.
-        Then it calls the `actionButton` method to create the 'Save' and 'Reset' buttons.
-
-        This method does not return anything.
-        """
-        self.generator()
-        self.actionButton()
-
-    def generator(self):
-        """
-        This method generates the form for each parameter defined in the PARAMETERS dictionary.
-
-        For each parameter, it checks the type of the parameter. If the type is 'spinbox', it creates a spinbox form with the specified minimum, maximum, and current value. If the type is 'dropdown', it creates a dropdown form with the specified items and current value. If the 'disabled' key is present and set to True, the form is disabled.
-
-        The generated form and its corresponding label are then stored as attributes of the ParameterLayout object, with the key of the parameter appended with '_form' and '_label' respectively.
-
-        This method does not return anything.
-        """
-
-        for key, value in PARAMETERS.items():
-            if value["type"] == "spinbox":
-                label = self.label(value["label"])
-                form = self.spinbox(value["minimum"], value["maximum"], value["value"])
-
-                setattr(self, f"{key}_label", label)
-                setattr(self, f"{key}_form", form)
-            elif value["type"] == "dropdown":
-                label = self.label(value["label"])
-                form = self.dropdown(value["items"], value["value"])
-                form.setDisabled(value.get("disabled", False))
-
-                setattr(self, f"{key}_label", label)
-                setattr(self, f"{key}_form", form)
-
-    def button(self, text: str) -> QPushButton:
-        btn = QPushButton(self.top_groupbox)
-        btn.setText(text)
-        self.top_vbox.addWidget(btn)
-        return btn
-
-    def values(self):
-        values = {}
-        for key, value in PARAMETERS.items():
-            if value["type"] == "spinbox":
-                values[key] = self.__dict__[f"{key}_form"].value()
-            elif value["type"] == "dropdown":
-                values[key] = self.__dict__[f"{key}_form"].currentText()
-        return values
-
-    def label(self, text: str) -> QLabel:
-        label = QLabel()
-        label.setText(text)
-
+    def label(self, text):
+        label = QLabel(text, self.param_box)
         self.top_vbox.addWidget(label)
         return label
 
-    def spinbox(self, minimum: int, maximum: int, value: int) -> QSpinBox:
-        spinbox = QSpinBox(self.top_groupbox)
-        spinbox.setRange(minimum, maximum)
-        spinbox.setValue(value)
+    def generator(self):
+        for key, value in PARAMETERS.items():
+            try:
+                form_creator = getattr(self, value["type"])
+                label = self.label(value["label"])
+                form = form_creator(value)
+                setattr(self, f"{key}_label", label)
+                setattr(self, f"{key}_form", form)
+            except ValueError as e:
+                logging.error(f"Error creating form for parameter {key}: {e}")
 
-        self.top_vbox.addWidget(spinbox)
-        return spinbox
+    def spinbox(self, value):
+        return self._bounded_form(QSpinBox, value["minimum"], value["maximum"], value["value"])
 
-    def dropdown(self, items: list, value: bool) -> QComboBox:
-        dropdown = QComboBox(self.top_groupbox)
-        dropdown.addItems(items)
-        dropdown.setCurrentText(ENABLE if value else DISABLE)
-
-        self.top_vbox.layout().addWidget(dropdown)
+    def dropdown(self, value):
+        dropdown = self._choices_form(
+            QComboBox, value["items"], value["value"])
+        dropdown.setDisabled(value.get("disabled", False))
         return dropdown
+
+    def choice(self, value):
+        choice = self._choices_form(QComboBox, value["items"], value["value"])
+        choice.setDisabled(value.get("disabled", False))
+        return choice
+
+    def _bounded_form(self, form_class, minimum, maximum, value):
+        if not minimum <= value <= maximum:
+            raise ValueError(
+                f"Invalid value: {value}. Must be in range {minimum} to {maximum}.")
+        form = form_class(self.param_box)
+        form.setRange(minimum, maximum)
+        form.setValue(value)
+        self.top_vbox.addWidget(form)
+        return form
+
+    def _choices_form(self, form_class, items, value):
+        if value not in items:
+            raise ValueError(
+                f"Invalid value: {value}. Must be in items {items}.")
+        form = form_class(self.param_box)
+        form.addItems(items)
+        form.setCurrentText(value)
+        self.top_vbox.layout().addWidget(form)
+        return form
+
+    def show(self):
+        self.generator()
+        self.create_action_buttons()

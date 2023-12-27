@@ -6,11 +6,11 @@ from PySide6.QtWidgets import QMessageBox
 APP_NAME = "SmokeGuard: YOLO Smoking Activity Monitor"
 APP_VERSION = "v1.0.0"
 APP_AUTHOR = "Alif Fatul"
-APP_WEBSITE = "https://github.com/aliffatul/SmokeGuard"
+APP_WEBSITE = "https://github.com/aliffatulmf/SmokeGuard"
 APP_PYSIDE_VERSION = PySide6.__version__
 
 
-def about_notification_box():
+def show_about_dialog():
     text = f"""
         {APP_NAME}
         Version: {APP_VERSION}
@@ -19,8 +19,8 @@ def about_notification_box():
         PySide version: {APP_PYSIDE_VERSION}
         CUDA support: {'Yes' if torch.cuda.is_available() else 'No'}
         """
-    about = QMessageBox()
-    about.setWindowIcon(QIcon("assets/icon/icon.png"))
-    about.setWindowTitle("About")
-    about.setText(text)
-    about.exec()
+    about_dialog = QMessageBox()
+    about_dialog.setWindowIcon(QIcon("assets/icon/icon.png"))
+    about_dialog.setWindowTitle("About This Application")
+    about_dialog.setText(text)
+    about_dialog.exec()

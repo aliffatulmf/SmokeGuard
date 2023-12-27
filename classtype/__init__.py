@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage
 
 
 class ImageType:

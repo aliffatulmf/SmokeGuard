@@ -1,6 +1,0 @@
-FATAL = "fatal"
-ERROR = "error"
-WARNING = "warning"
-INFO = "info"
-SUCCESS = "success"
-DEBUG = "debug"
