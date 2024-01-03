@@ -1,166 +1,137 @@
-import logging
-
-import torch
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import (QComboBox, QFrame, QGroupBox, QLabel,
-                               QMessageBox, QPushButton, QSpinBox, QVBoxLayout,
-                               QWidget)
+                               QPushButton, QSpinBox, QVBoxLayout)
 
-from pkg.cfg import ConfigValues
-
-config = ConfigValues()
-
-ENABLE = "Enable"
-DISABLE = "Disable"
-SWITCH = [ENABLE, DISABLE]
-
-PARAMETERS = {
-    "conf": {
-        "type": "spinbox",
-        "label": "Confidence Threshold",
-        "minimum": 1,
-        "maximum": 100,
-        "value": config.get("conf") * 100,
-    },
-    "iou": {
-        "type": "spinbox",
-        "label": "IoU Threshold",
-        "minimum": 1,
-        "maximum": 100,
-        "value": config.get("iou") * 100,
-    },
-    "hardware_acceleration": {
-        "type": "choice",
-        "label": "Hardware Acceleration",
-        "items": ["CPU", "CUDA"],
-        "value": "CUDA" if torch.cuda.is_available() else "CPU",
-        "disabled": True,
-    },
-    "agnostic": {
-        "type": "dropdown",
-        "label": "Class-Agnostic NMS",
-        "items": SWITCH,
-        "value": config.get("agnostic"),
-    },
-    "amp": {
-        "type": "dropdown",
-        "label": "Automatic Mixed Precision",
-        "items": SWITCH,
-        "value": config.get("amp"),
-    },
-}
+from meta.io import CONFIG_READ, ConfigIO
+from meta.signal import ParameterNamespace
 
 
-class SettingsLayout:
-    def __init__(self, parent: QWidget = None):
-        self.parent = parent
+class ParametersLayout(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setGeometry(20, 40, 350, 768)
 
-        self.frame = QFrame()
-        self.frame.setGeometry(20, 50, 200, 768)
-        self.frame.setParent(parent)
+        self.gpbox = QGroupBox()
+        self.gpbox.setTitle("Parameters")
+        self.gpbox.setFixedWidth(300)
+        self.gpbox.setFixedHeight(670)
+        self.gpbox.setParent(self)
 
-        self.param_box = QGroupBox()
-        self.param_box.setTitle("Parameters")
-        self.param_box.setFixedWidth(190)
-        self.param_box.setFixedHeight(400)
-        self.param_box.setParent(self.frame)
+        self.layout = QVBoxLayout(self.gpbox)
+        self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.layout.setSpacing(10)
+        
+        # SpinBox untuk confidence dan iou threshold
+        self.confidence_spinbox = QSpinBox()
+        self.confidence_spinbox.setRange(0, 100)
+        self.confidence_spinbox.setValue(int(CONFIG_READ[ConfigIO.CONFIDENCE] * 100))
+        
+        self.iou_threshold_spinbox = QSpinBox()
+        self.iou_threshold_spinbox.setRange(0, 100)
+        self.iou_threshold_spinbox.setValue(int(CONFIG_READ[ConfigIO.IOU] * 100))
 
-        self.top_vbox = QVBoxLayout(self.param_box)
-        self.top_vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+        # ComboBox untuk hardware acceleration
+        self.hardware_acceleration_combobox = QComboBox()
+        self.hardware_acceleration_combobox.addItems(["CUDA", "CPU"])
+        self.hardware_acceleration_combobox.setCurrentText("CUDA" if CONFIG_READ[ConfigIO.DEVICE] == "cuda" else "CPU")
 
-    def save_values(self):
-        values = {}
-        for k, v in PARAMETERS.items():
-            if v["type"] == "spinbox":
-                values[k] = self.__dict__[f"{k}_form"].value()
-            elif v["type"] == "dropdown":
-                values[k] = self.__dict__[f"{k}_form"].currentText()
+        # ComboBox untuk agnostic augment dan amp
+        self.agnostic_combobox = QComboBox()
+        self.agnostic_combobox.addItems(["Enable", "Disable"])
+        self.agnostic_combobox.setCurrentText("Enable" if CONFIG_READ[ConfigIO.AGNOSTIC] else "Disable")
+        
+        self.augment_combobox = QComboBox()
+        self.augment_combobox.addItems(["Enable", "Disable"])
+        self.augment_combobox.setCurrentText("Enable" if CONFIG_READ[ConfigIO.AUGMENT] else "Disable")
+        
+        self.amp_combobox = QComboBox()
+        self.amp_combobox.addItems(["Enable", "Disable"])
+        self.amp_combobox.setCurrentText("Enable" if CONFIG_READ[ConfigIO.AMP] else "Disable")
 
-        config.update(values)
-        if config.save():
-            self.show_save_notif()
+        # Tambahkan widget ke layout
+        self.layout.addWidget(QLabel("Confidence Threshold"))
+        self.layout.addWidget(self.confidence_spinbox)
 
-    @staticmethod
-    def show_save_notif():
-        message_box = QMessageBox()
-        message_box.setWindowIcon(QIcon("assets/icon/icon.png"))
-        message_box.setWindowTitle("Save Notification")
-        message_box.setText(
-            "Your changes have been successfully saved.\nPlease restart the application for the changes to take effect.")
-        message_box.setStandardButtons(QMessageBox.Ok)
-        message_box.exec()
+        self.layout.addWidget(QLabel("IoU Threshold"))
+        self.layout.addWidget(self.iou_threshold_spinbox)
 
-    def create_action_buttons(self):
-        save_btn = QPushButton("Save")
-        save_btn.clicked.connect(lambda: self.save_values())
+        self.layout.addWidget(QLabel("Hardware Acceleration"))
+        self.layout.addWidget(self.hardware_acceleration_combobox)
 
-        reset_btn = QPushButton("Reset")
-        reset_btn.clicked.connect(lambda: self.reset_values())
+        self.layout.addWidget(QLabel("Agnostic NMS"))
+        self.layout.addWidget(self.agnostic_combobox)
+        
+        self.layout.addWidget(QLabel("Augmentation"))
+        self.layout.addWidget(self.augment_combobox)
 
-        self.param_box.layout().addWidget(save_btn)
-        self.param_box.layout().addWidget(reset_btn)
+        self.layout.addWidget(QLabel("Automatic Mixed Precision"))
+        self.layout.addWidget(self.amp_combobox)
 
-    def reset_values(self):
-        for k, v in PARAMETERS.items():
-            if v["type"] == "spinbox":
-                self.__dict__[f"{k}_form"].setValue(v["value"])
-            elif v["type"] == "dropdown":
-                self.__dict__[f"{k}_form"].setCurrentText(
-                    ENABLE if v["value"] else DISABLE)
-            elif v["type"] == "choice":
-                self.__dict__[f"{k}_form"].setCurrentText(v["value"])
+        # Tambahkan tombol save dan reset
+        self.save_button = QPushButton("Save")
+        self.save_button.clicked.connect(self.save_config)
+        self.reset_button = QPushButton("Reset")
+        self.reset_button.clicked.connect(self.reset_config)
+        self.layout.addWidget(self.save_button)
+        self.layout.addWidget(self.reset_button)
+        
+        self.label_frames = QLabel("<b><code>Frames:</b> 0</code>")
+        self.label_objects_detected = QLabel("<code><b>Object Detected:</b> 0</code>")
+        self.label_fps_values = QLabel("<code>0, 0, 0, 0</code>")
+        self.label_inference_times = QLabel("<code>0ms, 0ms, 0ms, 0ms</code>")
 
-    def label(self, text):
-        label = QLabel(text, self.param_box)
-        self.top_vbox.addWidget(label)
-        return label
+        self.layout.addWidget(self.label_frames)
+        self.layout.addWidget(self.label_objects_detected)
+        self.layout.addWidget(QLabel("<b><code>FPS [Min, Max, Avg]:</code></b>"))
+        self.layout.addWidget(self.label_fps_values)
+        self.layout.addWidget(QLabel("<b><code>Inference Times [Min, Max, Avg]:</code></b>"))
+        self.layout.addWidget(self.label_inference_times)
+        
+    def save_config(self):
+        # Declare variables
+        confidence_value = self.confidence_spinbox.value() / 100
+        iou_value = self.iou_threshold_spinbox.value() / 100
+        device_value = "cuda" if self.hardware_acceleration_combobox.currentText() == "CUDA" else "cpu"
+        agnostic_value = True if self.agnostic_combobox.currentText() == "Enable" else False
+        augment_value = True if self.augment_combobox.currentText() == "Enable" else False
+        amp_value = True if self.amp_combobox.currentText() == "Enable" else False
 
-    def generator(self):
-        for key, value in PARAMETERS.items():
-            try:
-                form_creator = getattr(self, value["type"])
-                label = self.label(value["label"])
-                form = form_creator(value)
-                setattr(self, f"{key}_label", label)
-                setattr(self, f"{key}_form", form)
-            except ValueError as e:
-                logging.error(f"Error creating form for parameter {key}: {e}")
+        # Save values
+        config_io = ConfigIO()
+        config_io.update_config(ConfigIO.CONFIDENCE, confidence_value)
+        config_io.update_config(ConfigIO.IOU, iou_value)
+        config_io.update_config(ConfigIO.DEVICE, device_value)
+        config_io.update_config(ConfigIO.AGNOSTIC, agnostic_value)
+        config_io.update_config(ConfigIO.AUGMENT, augment_value)
+        config_io.update_config(ConfigIO.AMP, amp_value)
 
-    def spinbox(self, value):
-        return self._bounded_form(QSpinBox, value["minimum"], value["maximum"], value["value"])
+    def reset_config(self):
+        # Declare variables
+        confidence_value = int(CONFIG_READ[ConfigIO.CONFIDENCE] * 100)
+        iou_value = int(CONFIG_READ[ConfigIO.IOU]* 100)
+        device_value = "CUDA" if CONFIG_READ[ConfigIO.DEVICE] == "cuda" else "CPU"
+        agnostic_value = "Enable" if CONFIG_READ[ConfigIO.AGNOSTIC] else "Disable"
+        augment_value = "Enable" if CONFIG_READ[ConfigIO.AUGMENT] else "Disable"
+        amp_value = "Enable" if CONFIG_READ[ConfigIO.AMP] else "Disable"
 
-    def dropdown(self, value):
-        dropdown = self._choices_form(
-            QComboBox, value["items"], value["value"])
-        dropdown.setDisabled(value.get("disabled", False))
-        return dropdown
+        # Reset values
+        self.confidence_spinbox.setValue(confidence_value)
+        self.iou_threshold_spinbox.setValue(iou_value)
+        self.hardware_acceleration_combobox.setCurrentText(device_value)
+        self.agnostic_combobox.setCurrentText(agnostic_value)
+        self.augment_combobox.setCurrentText(augment_value)
+        self.amp_combobox.setCurrentText(amp_value)
+    
+    @Slot(ParameterNamespace)
+    def signal_receiver(self, signal):
+        # Declare variables
+        frames_value = f"<b><code>Frames:</b> {signal.frames}</code>"
+        objects_detected_value = f"<b><code>Object Detected:</b> {signal.total_object}</code>"
+        fps_values_value = f"<code>{signal.fps[0]:.2f}, {signal.fps[1]:.2f}, {signal.fps[2]:.2f}, {signal.fps[3]:.2f}</code>"
+        inference_times_value = f"<code>{signal.inference[0]:.2f}ms, {signal.inference[1]:.2f}ms, {signal.inference[2]:.2f}ms, {signal.inference[3]:.2f}ms</code>"
 
-    def choice(self, value):
-        choice = self._choices_form(QComboBox, value["items"], value["value"])
-        choice.setDisabled(value.get("disabled", False))
-        return choice
-
-    def _bounded_form(self, form_class, minimum, maximum, value):
-        if not minimum <= value <= maximum:
-            raise ValueError(
-                f"Invalid value: {value}. Must be in range {minimum} to {maximum}.")
-        form = form_class(self.param_box)
-        form.setRange(minimum, maximum)
-        form.setValue(value)
-        self.top_vbox.addWidget(form)
-        return form
-
-    def _choices_form(self, form_class, items, value):
-        if value not in items:
-            raise ValueError(
-                f"Invalid value: {value}. Must be in items {items}.")
-        form = form_class(self.param_box)
-        form.addItems(items)
-        form.setCurrentText(value)
-        self.top_vbox.layout().addWidget(form)
-        return form
-
-    def show(self):
-        self.generator()
-        self.create_action_buttons()
+        # Update labels
+        self.label_frames.setText(frames_value)
+        self.label_objects_detected.setText(objects_detected_value)
+        self.label_fps_values.setText(fps_values_value)
+        self.label_inference_times.setText(inference_times_value)

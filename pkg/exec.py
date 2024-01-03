@@ -1,25 +1,25 @@
 import sys
 
+from PySide6.QtWidgets import QApplication
 
-class Executor:
-    def __init__(self, opt):
-        if opt is None:
-            raise ValueError("opt should not be None")
-        self.opt = opt
+from gui.window import Window
 
-    def __enter__(self):
-        if self.opt is None:
-            raise ValueError("Invalid state, opt should not be None")
-        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.exit(0)
+def run():
+    def parseargs():
+        import argparse
 
-    def target(self, func, h):
-        if not callable(func):
-            raise ValueError("func should be callable")
-        if h is None:
-            raise ValueError("h should not be None")
-        
-        if h:
-            func(self.opt)
+        parser = argparse.ArgumentParser(description="This script allows you to configure the device, model, source, and save and verbose options for running an inference.", prog="control_panel.py run")
+        parser.add_argument("--device", choices=["cpu", "cuda"], default="cuda", help="specify the device to be used for inference. options are 'cpu' or 'cuda'. by default, 'cuda' is used. if 'cuda' is unavailable, 'cpu' is used.")
+        parser.add_argument("--single", action="store_true", help="specify whether to use a single model for inference. if specified, a single model is used.")
+        parser.add_argument("--source", default="0", help="specify the source for inference. the default value is 0.")
+        parser.add_argument("--verbose", action="store_true", help="specify whether to display verbose output. if specified, verbose output is displayed.")
+        return parser
+
+    parser = parseargs()
+    args = parser.parse_args(sys.argv[2:])
+
+    app = QApplication([])
+    window = Window(**vars(args))
+    window.showMaximized()
+    app.exec()

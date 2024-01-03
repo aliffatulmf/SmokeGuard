@@ -5,7 +5,7 @@ class ImageMetadata:
     def __init__(self, image_data=None, image_name=None, confidence_score=None, image_timestamp: datetime=None):
         self.image_data = image_data
         self.image_name = image_name
-        self.confidence_score = round(confidence_score, 4)
+        self.confidence_score = confidence_score
         self.image_timestamp: datetime = image_timestamp
 
     def get(self, attribute_key):

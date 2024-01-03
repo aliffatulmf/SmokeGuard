@@ -3,7 +3,7 @@ import torch
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QMessageBox
 
-APP_NAME = "SmokeGuard: YOLO Smoking Activity Monitor"
+APP_NAME = "Aplikasi Pendeteksi Rokok"
 APP_VERSION = "v1.0.0"
 APP_AUTHOR = "Alif Fatul"
 APP_WEBSITE = "https://github.com/aliffatulmf/SmokeGuard"

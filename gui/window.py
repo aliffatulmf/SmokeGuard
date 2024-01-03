@@ -6,10 +6,13 @@ from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import QMainWindow, QMenuBar, QMessageBox
 
 from gui.dialog import APP_NAME, show_about_dialog
-from gui.layout.camera import CameraLayout
-from gui.layout.parameter import SettingsLayout
+from gui.layout.camera import VideoFeedDisplay
+# from gui.layout.parameter import SettingsLayout
+from gui.layout.parameter import ParametersLayout
 from gui.snapshot import SnapshotWindow
-from threads.camera import CameraThread
+from meta.io import ConfigIO
+# from threads.camera import CameraThread
+from threads.inference import Inference
 
 
 def detect_end_notify(x):
@@ -25,36 +28,35 @@ class Window(QMainWindow):
     def __init__(self, **kwargs):
         super().__init__()
 
+        self.config_io = ConfigIO()
+
         # Window settings
-        self.setFixedSize(1200, 690)
+        self.setMinimumWidth(1400)
+        self.setMinimumHeight(690)
         self.set_application_icon("assets/icon/icon.png")
         self.setWindowTitle(APP_NAME)
         self.set_application_background(Qt.GlobalColor.white)
 
         # Layouts
-        try:
-            cfg_layout = SettingsLayout(self)
-            cfg_layout.show()
-        except Exception as e:
-            logging.critical(f"Error from SettingsLayout: {e}")
-            exit(1)
-       
-        # Camera 
-        self.snapshot_window = SnapshotWindow()
-        self.camera_thread = CameraThread(**kwargs)
-        self.camera_layout = CameraLayout(self, self.camera_thread, **kwargs)
+        self.parameter_frame = ParametersLayout(self)
+
+        # Camera
+        self.snapshot = SnapshotWindow()
+        self.inference = Inference(**kwargs)
+        self.video_feed_display = VideoFeedDisplay(self)
 
         # Menu bar
         menu_layout: QMenuBar = QMenuBar(self)
         menu_layout.setMinimumWidth(1360)
-        menu_layout.addAction("Snapshots", self.snapshot_window.show)
+        menu_layout.addAction("Snapshots", self.snapshot.showMaximized)
         menu_layout.addAction("About", show_about_dialog)
-       
-        # Signals 
-        self.camera_thread.EndOfDetection.connect(detect_end_notify)
-        self.camera_thread.ImageSignal.connect(self.camera_layout.slot_image)
-        self.camera_thread.SnapshotSignal.connect(self.snapshot_window.slot_image)
-        self.camera_thread.start()
+
+        # Signals
+        self.inference.emitter.connect_camera_signal(self.video_feed_display.signal_receiver)
+        self.inference.emitter.connect_snapshot_signal(self.snapshot.signal_receiver)
+        self.inference.emitter.connect_parameter_signal(self.parameter_frame.signal_receiver)
+        
+        self.inference.start()
 
     def set_application_icon(self, icon):
         if os.path.exists(icon):
@@ -68,13 +70,13 @@ class Window(QMainWindow):
         self.setPalette(palette)
 
     def exit_application(self):
-        if getattr(self, "snapshot_window", None) and self.snapshot_window.isVisible():
+        if getattr(self, "snapshot", None) and self.snapshot.isVisible():
             self.safe_stop_camera()
-            self.snapshot_window.close()
+            self.snapshot.close()
 
     def safe_stop_camera(self):
-        if self.camera_thread.isRunning():
-            self.camera_thread.stop_thread()
+        if self.inference.isRunning():
+            self.inference.stop()
 
     def closeEvent(self, event: QCloseEvent):
         exit_confirm = QMessageBox()
@@ -86,12 +88,12 @@ class Window(QMainWindow):
         exit_confirm.setDefaultButton(QMessageBox.No)
 
         if exit_confirm.exec() == QMessageBox.Yes:
-            if self.snapshot_window.isVisible():
+            if self.snapshot.isVisible():
                 logging.info("Closing snapshot window...")
-                self.snapshot_window.close()
+                self.snapshot.close()
             
-            if self.camera_thread.isRunning():
-                self.camera_thread.stop_thread()
+            if self.inference.isRunning():
+                self.inference.stop()
             
             logging.info("Exiting application...")
             event.accept()

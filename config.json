@@ -1,9 +1,10 @@
 {
-    "conf": 0.35,
+    "confidence": 0.35,
     "iou": 0.45,
-    "agnostic": "Enable",
+    "agnostic": false,
     "max_det": 1000,
-    "multi_label": "Enable",
-    "augment": "Enable",
-    "amp": "Disable"
+    "amp": false,
+    "multi_label": true,
+    "augment": true,
+    "device": "cpu"
 }

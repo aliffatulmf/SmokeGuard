@@ -1,5 +1,6 @@
 import importlib
 import importlib.util
+import socket
 import subprocess
 
 
@@ -81,3 +82,38 @@ def is_package_installed(package_name):
     """
     spec = importlib.util.find_spec(package_name)
     return spec is not None
+
+
+def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except Exception as ex:
+        print(ex)
+        return False
+
+def check_and_install(deps, auto_install=False):
+    if not check_internet_connection():
+        print("Tidak ada koneksi internet. Silakan periksa koneksi Anda dan coba lagi.")
+        return False
+
+    not_installed = []
+    for package in deps:
+        try:
+            dist = importlib.metadata.distribution(package)
+            print(f"{package} ({dist.version}) is installed.")
+        except importlib.metadata.PackageNotFoundError:
+            print(f"{package} is NOT installed.")
+            not_installed.append(package)
+
+    if not_installed:
+        if auto_install:
+            for package in not_installed:
+                subprocess.check_call(["python", "-m", "pip", "install", package])
+            return True
+        else:
+            return False
+    else:
+        print("Semua paket sudah terpasang.")
+        return True

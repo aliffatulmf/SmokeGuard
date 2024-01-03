@@ -3,29 +3,17 @@ import pathlib
 import shutil
 
 
-class PyCacheManager:
-    """
-    Class for managing Python cache.
-    """
+def clean_python_cache(exclude=None):
+    exclude = exclude or []
+    root_dir = pathlib.Path(".")
 
-    def __init__(self, exclude=None):
-        """
-        Initialize PyCacheManager with a list of directories to exclude from cleaning.
-
-        Args:
-            exclude (list, optional): List of directories to exclude from cleaning. Defaults to None.
-        """
-        self.exclude = exclude or []
-        self.root_dir = pathlib.Path(".")
-
-    def clean(self):
-        """
-        Clean Python cache.
-        """
-        for pycache_dir in self.root_dir.rglob("__pycache__"):
-            if pycache_dir.name not in self.exclude:
-                try:
+    for pycache_dir in root_dir.rglob("*"):
+        if pycache_dir.is_dir() and pycache_dir.name not in exclude:
+            try:
+                if pycache_dir.name == "__pycache__" and any(child.suffix in {'.pyc', '.pyo', '.pyd'} for child in pycache_dir.iterdir()):
                     shutil.rmtree(pycache_dir)
                     logging.info(f"Removed {pycache_dir}")
-                except OSError as e:
-                    raise OSError(f"Error: {e.filename} - {e.strerror}.", style="bold red")
+                else:
+                    logging.warning(f"{pycache_dir} is not a valid Python cache directory.")
+            except OSError as e:
+                logging.error(f"Error: {e.filename} - {e.strerror}.")

@@ -1,13 +1,16 @@
-from typing import List
-
 from PySide6.QtCore import Qt, Slot
-from PySide6.QtGui import QFont, QIcon, QImage, QPixmap
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QScrollArea, QVBoxLayout,
                                QWidget)
 
+from meta.signal import SnapshotNamespace
+
 
 class SnapshotWindow(QWidget):
-    index = 1
+    FONT = QFont()
+    FONT.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
+    FONT.setFamily("Segeo UI")
+    FONT.setPixelSize(14)
 
     def __init__(self) -> None:
         super().__init__()
@@ -16,27 +19,17 @@ class SnapshotWindow(QWidget):
         self.scrollArea = QScrollArea()
         self.scrollLayout = QVBoxLayout()
 
-        self.mainLayout = None
-        self.label_list: List[tuple[QLabel, QLabel, QLabel]] = []
-        self.initialize_user_interface()
-    
-    @classmethod
-    def index_add(cls):
-        cls.index += 1
-
-    def initialize_user_interface(self):
         self.setWindowTitle("Snapshot Window")
-        self.setFixedHeight(600)
+        self.setMinimumHeight(300)
         self.setMinimumWidth(1200)
-        self.setMaximumWidth(1380)
 
         self.scrollWidget = QWidget(self)
         self.scrollLayout = QVBoxLayout(self.scrollWidget)
         self.scrollLayout.setContentsMargins(30, 30, 0, 0)
         self.scrollWidget.setStyleSheet("background: #ffffff; border-radius: 10px;")
 
-        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setWidget(self.scrollWidget)
 
@@ -44,67 +37,108 @@ class SnapshotWindow(QWidget):
         self.mainLayout.setContentsMargins(0, 0, 0, 0)
         self.mainLayout.addWidget(self.scrollArea)
 
-    def add_image(self, metadata):
-        # Remove the first widget and labels if the number of widgets exceeds 10
-        # if self.scrollLayout.count() > 10:
-        #     self.remove_first_widget_and_labels()
+        self.listed_widgets = []
 
-        horizontal_layout = QHBoxLayout()
-        horizontal_layout.setAlignment(Qt.AlignVCenter)
+    def create_label_and_add_to_layout(self, text, layout):
+        label = self.create_label(text)
+        label.setStyleSheet("margin-top: 20px;")
+        layout.addWidget(label)
+        return label
 
-        font = QFont()
-        font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
-        font.setFamily("Segeo UI")
-        font.setPixelSize(18)
+    def create_label_value_pair(self, label_text, value_text, vl1, vl2):
+        label = self.create_label_and_add_to_layout(label_text, vl1)
+        value = self.create_label_and_add_to_layout(value_text, vl2)
+        return label, value
+    
 
-        index_label = QLabel(f"{self.index}.")
-        index_label.setFont(font)
-        index_label.setFixedWidth(30)
-        self.index_add()
+    def create_horizontal_layout(self):
+        layout = QHBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        return layout
 
-        name_label = QLabel(f"Name: {metadata.image_name}")
-        name_label.setFont(font)
-        name_label.setWordWrap(True)
+    def create_vertical_layout(self):
+        layout = QVBoxLayout()
+        # layout.setSpacing(10)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        return layout
 
-        conf_label = QLabel(
-            f"Confidence: {metadata.confidence_score * 100:.2f}%")
-        conf_label.setFont(font)
-        conf_label.setWordWrap(True)
+    def create_label(self, text):
+        label = QLabel(text)
+        label.setFont(self.FONT)
+        label.setWordWrap(False)
+        return label
+    
+    def delete_widgets_from_layout(self, layout):
+        for i in reversed(range(layout.count())):
+            widget = layout.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+    
+    def remove_first_widget(self):
+        if not self.listed_widgets:
+            return
 
-        # Format the timestamp to a shorter format, e.g., "12 Dec 15:45"
-        time_label = QLabel(
-            f"Time: {metadata.image_timestamp.strftime('%d %b %H:%M:%S')}")
-        time_label.setFont(font)
-        time_label.setWordWrap(False)
+        widget_dict = self.listed_widgets.pop(0)
 
-        labels_to_add = (index_label, name_label, conf_label, time_label)
-        for label in labels_to_add:
-            horizontal_layout.addWidget(label)
-        self.label_list.append(labels_to_add)
+        # Remove frame
+        frame = widget_dict["image_frame"]
+        self.scrollLayout.removeWidget(frame)
+        frame.deleteLater()
 
-        pixmap = QPixmap(metadata.image_data)
-        frame = QLabel()
-        frame.setPixmap(pixmap.scaledToHeight(600))
-        horizontal_layout.addWidget(frame)
+        # Remove widgets from vertical_layouts
+        for layout in widget_dict["vertical_layouts"]:
+            self.delete_widgets_from_layout(layout)
 
-        self.scrollLayout.addLayout(horizontal_layout)
+        # Remove all widgets from the hlayout and then remove hlayout
+        hl = widget_dict["horizontal_layout"]
+        self.delete_widgets_from_layout(hl)
+        self.scrollLayout.removeItem(hl)
+        hl.deleteLater()
 
-    def remove_first_widget_and_labels(self):
-        first_widget = self.scrollLayout.takeAt(0).widget()
-        if first_widget is not None:
-            self.scrollLayout.removeWidget(first_widget)
-            first_widget.deleteLater()
-
-        first_label_set = self.label_list.pop(0)
-        for label in first_label_set:
+        # Remove vlabels
+        for label in widget_dict["vertical_labels"]:
+            # Assuming you want to delete these labels
             label.deleteLater()
+    
+    @Slot(SnapshotNamespace)
+    def signal_receiver(self, data):
+        if self.scrollLayout.count() >= 50:
+            self.remove_first_widget()
 
-    @Slot(QPixmap)
-    def slot_pixmap(self, pixmap: QPixmap):
-        label = QLabel()
-        label.setPixmap(pixmap.scaled(300, 300))
-        self.scrollLayout.addWidget(label)
+        hl = self.create_horizontal_layout()
+        vl1 = self.create_vertical_layout()
+        vl2 = self.create_vertical_layout()
 
-    @Slot(QImage)
-    def slot_image(self, image):
-        self.add_image(image)
+        labels_and_values = [
+            ("Confidence:", f"{data.confidence * 100:.3f}% ({round(data.confidence * 100)}%)"),
+            ("Confidence / IoU Threshold:", f"{data.confidence_threshold} / {data.iou_threshold}"),
+            ("Inference Time:", f"{data.inference_time[0]:.2f} ms"),
+            ("Frame Per Second:", f"{data.fps[0]:.1f}"),
+        ]
+
+        labels = []
+        values = []
+        for label_text, value_text in labels_and_values:
+            label, value = self.create_label_value_pair(label_text, value_text, vl1, vl2)
+            labels.append(label)
+            values.append(value)
+
+        frame = QLabel()
+        frame.setStyleSheet("padding-right: 30px;")
+        frame.setPixmap(data.pixmap)
+
+        hl.addLayout(vl1)
+        hl.addLayout(vl2)
+        hl.addWidget(frame)
+
+        self.scrollLayout.addLayout(hl)
+
+        widget_dict = {
+            "horizontal_layout": hl,
+            "vertical_layouts": [vl1, vl2],
+            "vertical_labels": labels,
+            "vertical_values": values,
+            "image_frame": frame
+        }
+
+        self.listed_widgets.append(widget_dict)
