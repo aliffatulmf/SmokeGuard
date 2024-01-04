@@ -39,12 +39,20 @@ class SignalReceiver(QObject):
     def __init__(self, emitter: SignalEmitter):
         super().__init__()
         self.emitter = emitter
+        self.signals_and_slots = {
+            self.emitter.camera_signal: self.on_camera_signal,
+            self.emitter.snapshot_signal: self.on_snapshot_signal,
+            self.emitter.parameter_signal: self.on_parameter_signal,
+            self.emitter.eod_signal: self.on_end_of_detection_signal,
+        }
 
     def connect_signals(self):
-        self.emitter.camera_signal.connect(self.on_camera_signal)
-        self.emitter.snapshot_signal.connect(self.on_snapshot_signal)
-        self.emitter.parameter_signal.connect(self.on_parameter_signal)
-        self.emitter.eod_signal.connect(self.on_end_of_detection_signal)
+        for signal, slot in self.signals_and_slots.items():
+            signal.connect(slot)
+
+    def _execute_func(self, signal, func, *args, **kwargs):
+        if callable(func):
+            signal.connect(func, *args, **kwargs)
 
     @Slot()
     def on_camera_signal(self, func, *args, **kwargs):
@@ -61,7 +69,3 @@ class SignalReceiver(QObject):
     @Slot()
     def on_end_of_detection_signal(self, func, *args, **kwargs):
         self._execute_func(self.emitter.eod_signal, func, *args, **kwargs)
-
-    def _execute_func(self, signal, func, *args, **kwargs):
-        if callable(func):
-            signal.connect(func, *args, **kwargs)

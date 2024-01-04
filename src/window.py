@@ -13,37 +13,25 @@ from threads.inference import Inference
 
 class Window(QMainWindow):
     def __init__(self, **kwargs):
-        super().__init__()
-        
-        self.verbose = kwargs["verbose"]
-
-        # Window settings
-        self.setMinimumWidth(1400)
-        self.setMinimumHeight(690)
-        self.set_application_icon("assets/icon/icon.png")
-        self.setWindowTitle("Aplikasi Pendeteksi Rokok")
-        self.set_application_background(Qt.GlobalColor.white)
-
-        # Layouts
-        self.parameter_frame = ParametersLayout(self, **kwargs)
-
-        # Camera
-        self.snapshot = SnapshotWindow()
-        self.inference = Inference(**kwargs)
-        self.video_feed_display = VideoFeedDisplay(self)
-
-        # Menu bar
-        menu_layout = QMenuBar(self)
-        menu_layout.setMinimumWidth(1360)
-        menu_layout.addAction("Snapshots", self.snapshot.showMaximized)
-
-        # Signals
-        self.inference.emitter.connect_camera_signal(self.video_feed_display.signal_receiver)
-        self.inference.emitter.connect_snapshot_signal(self.snapshot.signal_receiver)
-        self.inference.emitter.connect_parameter_signal(self.parameter_frame.signal_receiver)
-        
-        self.inference.start()
-
+      super().__init__()
+      self.verbose = kwargs["verbose"]
+      self.setMinimumWidth(1400)
+      self.setMinimumHeight(690)
+      self.set_application_icon("assets/icon/icon.png")
+      self.setWindowTitle("Aplikasi Pendeteksi Rokok")
+      self.set_application_background(Qt.GlobalColor.white)
+      self.parameter_frame = ParametersLayout(self, **kwargs)
+      self.snapshot = SnapshotWindow()
+      self.inference = Inference(**kwargs)
+      self.video_feed_display = VideoFeedDisplay(self)
+      menu_layout = QMenuBar(self)
+      menu_layout.setMinimumWidth(1360)
+      menu_layout.addAction("Snapshots", self.snapshot.showMaximized)
+      self.inference.emitter.connect_camera_signal(self.video_feed_display.signal_receiver)
+      self.inference.emitter.connect_snapshot_signal(self.snapshot.signal_receiver)
+      self.inference.emitter.connect_parameter_signal(self.parameter_frame.signal_receiver)
+      self.inference.start()
+    
     def set_application_icon(self, icon):
         if not isinstance(icon, str):
             raise TypeError("Icon path must be a string.")
@@ -56,25 +44,21 @@ class Window(QMainWindow):
         else:
             raise FileNotFoundError(f"Icon not found at path: {icon}")
 
-    def set_application_background(self, color):
-       if isinstance(color, str):
-           if os.path.exists(color):
-               # If the background is a file path, set it as a background image
+    def set_application_background(self, c):
+       if isinstance(c, str):
+           if os.path.exists(c):
                self.setAutoFillBackground(True)
-               palette = self.palette()
-               palette.setBrush(QPalette.Background, QBrush(QPixmap(color)))
-               self.setPalette(palette)
+               p = self.palette()
+               p.setBrush(QPalette.Background, QBrush(QPixmap(c)))
+               self.setPalette(p)
            else:
-               # If the background is a string but not a file path, treat it as a color
-               self.setStyleSheet(f"background-color: {color};")
-       elif isinstance(color, QPalette):
-           # If the background is a QPalette, set it directly
-           self.setPalette(color)
-       elif isinstance(color, Qt.GlobalColor):
-           # If the background is a Qt.GlobalColor, convert it to a string and treat it as a color
-           palette = self.palette()
-           palette.setColor(self.backgroundRole(), color)
-           self.setPalette(palette)
+               self.setStyleSheet(f"background-color: {c};")
+       elif isinstance(c, QPalette):
+           self.setPalette(c)
+       elif isinstance(c, Qt.GlobalColor):
+           p = self.palette()
+           p.setColor(self.backgroundRole(), c)
+           self.setPalette(p)
        else:
            raise TypeError("Background must be a string (color or file path), a QPalette, or a Qt.GlobalColor.")
 
@@ -90,14 +74,12 @@ class Window(QMainWindow):
 
     def stop_snapshot(self):
         if self.snapshot.isVisible():
-            if self.verbose:
-                logging.info("Snapshot is visible. Closing snapshot.")
+            if self.verbose: logging.info("Snapshot is visible. Closing snapshot.")
             self.snapshot.close()
 
     def stop_inference(self):
         if self.inference.isRunning():
-            if self.verbose:
-                logging.info("Inference is running. Stopping inference thread.")
+            if self.verbose: logging.info("Inference is running. Stopping inference thread.")
             self.inference.stop_thread()
 
     def closeEvent(self, event: QCloseEvent):

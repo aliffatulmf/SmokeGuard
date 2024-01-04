@@ -5,14 +5,11 @@ from PySide6.QtWidgets import QGroupBox, QLabel
 
 class VideoFeedDisplay:
   def __init__(self, parent, x=350, y=40, width=963, height=540):
-      # GroupBox for Camera
       groupbox = QGroupBox(parent)
-    #   groupbox.setTitle("Camera")
       groupbox.setGeometry(x, y, width, height)
       groupbox.setFixedSize(width, height)
       groupbox.setStyleSheet("border: 3px solid #dee2e6; border-radius: 3px;")
 
-      # Label for displaying video feed
       self._video = QLabel(groupbox)
       self._video.setFixedSize(width, height)
       self._video.setAlignment(Qt.AlignmentFlag.AlignBottom)

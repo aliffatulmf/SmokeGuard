@@ -20,33 +20,19 @@ class ConfigIO:
     DEVICE = "device"
 
     def __init__(self, filename="config.json"):
-        self.filename = filename
+        self.filename, default_config = filename, self.default_config
         if not os.path.exists(self.filename):
-            self.write_config(self.default_config())
+            self.write_config(default_config())
 
     def default_config(self):
-        return {
-            self.CONFIDENCE: 0.5,
-            self.IOU: 0.5,
-            self.AGNOSTIC: False,
-            self.MAX_DET: 1000,
-            self.AMP: False,
-            self.MULTI_LABEL: False,
-            self.AUGMENT: False,
-            self.DEVICE: "cpu"
-        }
+        return {self.CONFIDENCE: 0.5, self.IOU: 0.5, self.AGNOSTIC: False, self.MAX_DET: 1000, self.AMP: False, self.MULTI_LABEL: False, self.AUGMENT: False, self.DEVICE: "cpu"}
 
     def read_config(self, keys=None):
-        with open(self.filename, "r") as f:
-            config = json.load(f)
-        if keys is None:
-            return config
-        else:
-            return {key: config.get(key, None) for key in keys}
+        with open(self.filename, "r") as f: config = json.load(f)
+        return {key: config.get(key, None) for key in keys} if keys else config
 
     def write_config(self, config):
-        with open(self.filename, "w") as f:
-            json.dump(config, f, indent=4)
+        with open(self.filename, "w") as f: json.dump(config, f, indent=4)
 
     def update_config(self, key, value):
         config = self.read_config()
@@ -66,30 +52,14 @@ class ModelHub:
     
     def load_model(self, path, device, half=False, verbose=False, **kwargs):
         logging.disable(logging.CRITICAL)
-
-        # Load the model
-        model = torch.hub.load("hub", "custom", path=path, source="local", force_reload=True, verbose=verbose)
-
-        # Set model parameters
+        model = torch.hub.load("hub", "custom", path=path, source="local", force_reload=True)
         parameters = [ConfigIO.CONFIDENCE, ConfigIO.IOU, ConfigIO.MAX_DET, ConfigIO.AGNOSTIC, ConfigIO.MULTI_LABEL, ConfigIO.AMP]
         for param in parameters:
             setattr(model, param, kwargs.get(param, self.config[param]))
-
-        # Move the model to the specified device
         model.to(device)
-
-        # Convert the model to half precision if specified
-        if half:
-            model.half()
-        else:
-            model.float()
-
-        # Set model names if provided
-        if kwargs.get("names") is not None:
-            model.names = kwargs.get("names")
-
+        model.half() if half else model.float()
+        if kwargs.get("names") is not None: model.names = kwargs.get("names")
         logging.disable(logging.NOTSET)
-
         return model
     
     @staticmethod
@@ -97,20 +67,13 @@ class ModelHub:
         return next(model.parameters()).dtype
 
 def LoadSource(source, verbose=False):
-    if not isinstance(source, str):
-        raise ValueError("Argument 'source' must be a string.")
-    if not isinstance(verbose, bool):
-        raise ValueError("Argument 'verbose' must be a boolean.")
-
+    if not isinstance(source, str): raise ValueError("Argument 'source' must be a string.")
+    if not isinstance(verbose, bool): raise ValueError("Argument 'verbose' must be a boolean.")
     cap = cv2.VideoCapture(source)
-
     if not cap.isOpened():
-        if verbose:
-            logging.error(f"Failed to load source: {source}")
+        if verbose: logging.error(f"Failed to load source: {source}")
         return None
-
-    if verbose:
-        logging.info(f"Successfully loaded source: {source}")
+    if verbose: logging.info(f"Successfully loaded source: {source}")
     return cap
 
 
@@ -119,7 +82,6 @@ def ProfileColors(label):
         "rokok": (66, 66, 255),
         "person": (95, 47, 5),
     }
-    
     return colors.get(label, (0, 0, 0))
 
 def Font(size=14, weight=QFont.Weight.Normal, antialias=False):
