@@ -2,7 +2,7 @@ import cv2
 from PySide6.QtGui import QImage, QPixmap
 
 
-def resize_frame(frame, scale=1):
+def ResizeFrame(frame, scale=1):
     # Get the dimensions of the frame
     height, width = frame.shape[:2]
 
@@ -16,7 +16,7 @@ def resize_frame(frame, scale=1):
     return resized_frame
 
 
-def frame_to_pixmap(frame):
+def FrameToPixmap(frame):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     qimg = QImage(frame.data, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
     pixmap = QPixmap.fromImage(qimg)

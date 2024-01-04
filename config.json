@@ -3,8 +3,8 @@
     "iou": 0.45,
     "agnostic": false,
     "max_det": 1000,
-    "amp": false,
+    "amp": true,
     "multi_label": true,
     "augment": true,
-    "device": "cpu"
+    "device": "cuda"
 }

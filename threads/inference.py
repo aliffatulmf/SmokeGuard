@@ -1,106 +1,148 @@
+import logging
+
 import cv2
 
-from meta.counter import Counter
+from meta import CONFIG_READ
 from meta.counter.fps import FPS
+from meta.counter.general import CounterInt
 from meta.counter.inference_time import InferenceTime
-from meta.image.manipulation import frame_to_pixmap, resize_frame
-from meta.io import CONFIG_READ, ConfigIO, ModelHub, load_source
-from meta.model.path import model_path
+from meta.device.cuda import GetDevice
+from meta.image.manipulation import FrameToPixmap, ResizeFrame
+from meta.io import ConfigIO, LoadSource, ModelHub, ProfileColors
+from meta.model.path import ModelPath
 from meta.signal import ParameterNamespace, SignalEmitter, SnapshotNamespace
-from meta.thread import StoppableThread
+from meta.thread import StopControl
 
 
-class Inference(StoppableThread):
+class Inference(StopControl):
     def __init__(self, **kwargs):
         super().__init__()
-        self.device = kwargs["device"]
+
+        # Retrieve device and setup configurations
+        self.device, self.hw_brand = GetDevice(kwargs["device"], verbose=kwargs["verbose"])
+        self.verbose = kwargs["verbose"]
         self.source = kwargs["source"]
         self.single = kwargs["single"]
-        self.verbose = kwargs["verbose"]
-        self.models = [model_path("weights/model.pt"), model_path("weights/general.pt")]
+        self.half = kwargs["half"]
 
+        # Define models paths
+        self.models = [
+            ModelPath("weights/model.pt"),
+            ModelPath("weights/general.pt")
+        ]
+
+        # Initialize components
         self.emitter = SignalEmitter()
         self.model_hub = ModelHub()
         self.config = CONFIG_READ
-
         self.loaded_models = []
-        self.load_model()
-        print("success load model")
-    
-    def load_model(self):
-        if self.single:
-            # Load a single model instance
-            self.loaded_models = [self.model_hub.load_model(self.models[0], "cuda", names=["rokok"])]
-        else:
-            # Handling for multiple model instances
-            for i, model in enumerate(self.models):
-                if i == 1:
-                    kwgs = {
-                        "confidence": 0.60,
-                        "iou": 0.45,
-                        "agnostic": False,
-                        "max_det": 1000,
-                        "multi_label": True,
-                        "augment": False,
-                        "amp": True,
-                    }
-                    self.loaded_models.append(self.model_hub.load_model(model, "cuda", **kwgs))
-                    del kwgs
-                else:
-                    self.loaded_models.append(self.model_hub.load_model(model, "cuda", names=["rokok"]))
-        
-    def run(self):
-        cap = load_source(self.source, self.verbose)
-        print("success load source")
-        
-        fps = FPS()
-        infer_time = InferenceTime()
-        frames = Counter()
-        
-        while cap.isOpened() and not self._stop_requested:
-            fps.start()
 
-            obj_detected = 0
-            retrieve, frame = cap.read()
-            
-            if not retrieve:
-                break
-            
-            frames.add()
+        # Define model specific configurations
+        single_model_kwgs = {"names": ["rokok"]}
+        multiple_model_kwgs = {
+            "confidence": 0.60,
+            "iou": 0.45,
+            "agnostic": False,
+            "max_det": 1000,
+            "multi_label": True,
+            "augment": False,
+            "amp": True,
+        }
 
-            for model in self.loaded_models:
-                infer_time.start()
-                preds = model(frame).pandas().xyxy
-                infer_time.stop()
+        # Load models with their specific configurations
+        if self.verbose:
+            if self.single:
+                logging.info("Loading single model")
+            else:
+                logging.info("Loading multiple models")
+        
+        self.loaded_models = [
+            self.model_hub.load_model(model, self.device, self.half, **(single_model_kwgs if i != 1 else multiple_model_kwgs))
+            for i, model in enumerate(self.models) if not self.single or i == 0
+        ]
                 
-                for pred in preds:
-                    if pred.empty:
+    def run(self):
+        capture = LoadSource(self.source, self.verbose)
+
+        if capture is None:
+            raise ValueError("Failed to load source")
+
+        frames_per_second = FPS()
+        inference_time = InferenceTime()
+        frame_counter = CounterInt()
+
+        # Check model precision
+        fp = ModelHub.check_model_precision(self.loaded_models[0])
+        while capture.isOpened() and not self.stop_requested:
+            snapshot_checkpoint = []
+            
+            object_detected = 0
+            frames_per_second.start()
+            retrieval_successful, frame = capture.read()
+
+            if not retrieval_successful:
+                break
+
+            frame_counter.tap()
+            
+            for model in self.loaded_models:
+                inference_time.start()
+                predictions = model(frame).pandas().xyxy
+                inference_time.stop()
+
+                for prediction in predictions:
+                    if prediction.empty:
                         continue
-                    
-                    obj_detected = len(pred)
-                    for objs in pred.to_numpy():
-                        xmin, ymin, xmax, ymax, conf, _, name = objs
-                        xmin, ymin, xmax, ymax = map(int, [xmin, ymin, xmax, ymax])
 
-                        text = f"{name} {round(conf * 100)}%"
-                        text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_COMPLEX, 1, 1)
-                        tw, th = text_size[0] + 10, text_size[1] + 10
+                    for objects in prediction.to_numpy():
+                        if objects[6] not in ["rokok", "person"]:
+                            continue
+                        object_detected += 1
+                        
+                        x_min, y_min, x_max, y_max, confidence, _, name = objects
+                        x_min, y_min, x_max, y_max = map(int, [x_min, y_min, x_max, y_max])
+                        
+                        detection_text = f"{name} {round(confidence * 100)}%"
+                        text_size, _ = cv2.getTextSize(detection_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
+                        text_width, text_height = text_size[0] + 15, text_size[1] + 25
 
-                        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (66, 66, 255), 2)
-                        cv2.rectangle(frame, (xmin, ymin), (xmin + tw, ymin - th), (66, 66, 255), -1)
+                        cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), ProfileColors(name), 3)
+                        cv2.rectangle(frame, (x_min - 2, y_min), (x_min + text_width, y_min - text_height), ProfileColors(name), -1)
+                        cv2.putText(frame, detection_text, (x_min + 10, y_min - 15), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                        
+                        pixmap = FrameToPixmap(ResizeFrame(frame, scale=0.4))
+                        snapshot = SnapshotNamespace(
+                            confidence=confidence,
+                            inference_time=inference_time.stats,
+                            pixmap=pixmap,
+                        )
+                        snapshot_checkpoint.append(snapshot)
 
-                        cv2.putText(frame, text, (xmin, ymin - 5), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 1)
-
-                        if name == "rokok":
-                            pixmap = frame_to_pixmap(resize_frame(frame, scale=0.4))
-                            snap = SnapshotNamespace(
-                                conf, self.config[ConfigIO.CONFIDENCE], self.config[ConfigIO.IOU], infer_time.stats, fps.stats, pixmap)
-                            self.emitter.emit_snapshot_signal(snap)
+            frames_per_second.stop()
             
-            fps.stop()
-            
-            pixmap = frame_to_pixmap(resize_frame(frame, scale=0.5))
+            # Updating snapshot attribute values
+            for snapshot in snapshot_checkpoint:
+                snapshot.fps = frames_per_second.stats  # Set fps
+                snapshot.confidence_threshold = self.config[ConfigIO.CONFIDENCE] # Set confidence threshold
+                snapshot.iou_threshold = self.config[ConfigIO.IOU] # Set iou threshold
+                snapshot.accelerator = "CUDA" if "cuda" in self.device else "CPU" # Set accelerator
+                snapshot.hw_brand = self.hw_brand # Set hardware brand
+                snapshot.floating_point = fp # Set floating point
+
+                # Emit the snapshot signal
+                self.emitter.emit_snapshot_signal(snapshot_checkpoint.pop(0))
+
+            # Convert resized frame to pixmap and emit camera signal
+            pixmap = FrameToPixmap(ResizeFrame(frame, scale=0.5))
             self.emitter.emit_camera_signal(pixmap)
-            
-            params = ParameterNamespace(frames=frames.stats, fps=fps.stats, inference=infer_time.stats, total_object=obj_detected)
-            self.emitter.emit_parameter_signal(params)
+
+            # Parameters Setup
+            parameters = ParameterNamespace(
+                frames=frame_counter.size(), # Frame count
+                fps=frames_per_second.stats, # Frames per second
+                inference=inference_time.stats, # Inference statistics
+                total_object=object_detected, # Total objects detected
+            )
+
+            # Emit parameter signal
+            self.emitter.emit_parameter_signal(parameters)

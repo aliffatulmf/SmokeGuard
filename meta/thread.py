@@ -1,26 +1,26 @@
 from PySide6.QtCore import QThread
 
 
-class StoppableThread(QThread):
+class StopControl(QThread):
     def __init__(self):
         super().__init__()
-        self._stop_requested = False
+        self.stop_requested = False
 
     def request_stop(self):
-        self._stop_requested = True
+        self.stop_requested = True
 
-    def force_stop(self):
+    def terminate_thread(self):
         self.terminate()
 
-    def stop(self):
+    def stop_thread(self):
         self.request_stop()
         for _ in range(3):
             if not self.isRunning():
                 return
             QThread.msleep(100)
-        self.force_stop()
+        self.terminate_thread()
 
-    def restart(self):
+    def restart_thread(self):
         if self.isRunning():
-            self.stop()
+            self.stop_thread()
         self.start()

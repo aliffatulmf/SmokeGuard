@@ -9,13 +9,11 @@ class FPS:
         self.stack = deque(maxlen=lim)
 
     def start(self):
-        """Start the timer."""
         if self._start_ns is not None:
             raise RuntimeError("FPS already started. Call stop before starting again.")
         self._start_ns = time.perf_counter_ns()
 
     def stop(self):
-        """Stop the timer and update the statistics."""
         if self._start_ns is None:
             raise RuntimeError("FPS not started. Call start before stopping.")
         duration = 1 / ((time.perf_counter_ns() - self._start_ns) / 1e9)
@@ -24,7 +22,6 @@ class FPS:
         self._start_ns = None
 
     def reset(self):
-        """Reset the statistics and stack."""
         self._start_ns = None
         self.stats = [0.0, 0.0, 0.0, 0.0]
         self.stack.clear()

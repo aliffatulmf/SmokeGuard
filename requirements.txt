@@ -18,3 +18,4 @@ onnxruntime
 setuptools
 PySide6
 dill
+py-cpuinfo

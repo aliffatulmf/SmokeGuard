@@ -9,5 +9,5 @@ weights/*.pt
 weights/*.onnx
 *.mp4
 
-cache/
 images/
+hub/

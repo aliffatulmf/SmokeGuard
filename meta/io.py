@@ -4,10 +4,9 @@ import os
 
 import cv2
 import torch
+from PySide6.QtGui import QFont
 
-
-class ConfigKeyError(Exception):
-    """A custom exception used to report errors in use of ConfigIO class"""
+from .exceptions import ConfigKeyError
 
 
 class ConfigIO:
@@ -61,27 +60,48 @@ class ConfigIO:
         config[key] = value
         self.write_config(config)
 
-CONFIG_READ = ConfigIO().read_config()
-
 class ModelHub:
-    def __init__(self, config=CONFIG_READ):
+    def __init__(self, config=ConfigIO().read_config()):
         self.config = config
     
-    def load_model(self, path, device, **kwargs):
-        model = torch.hub.load("cache/yolov5", "custom", path=path, source="local", force_reload=True)
-        model.conf = kwargs.get(ConfigIO.CONFIDENCE, self.config[ConfigIO.CONFIDENCE])
-        model.iou = kwargs.get(ConfigIO.IOU, self.config[ConfigIO.IOU])
-        model.max_det = kwargs.get(ConfigIO.MAX_DET, self.config[ConfigIO.MAX_DET])
-        model.agnostic = kwargs.get(ConfigIO.AGNOSTIC, self.config[ConfigIO.AGNOSTIC])
-        model.multi_label = kwargs.get(ConfigIO.MULTI_LABEL, self.config[ConfigIO.MULTI_LABEL])
-        model.amp = kwargs.get(ConfigIO.AMP, self.config[ConfigIO.AMP])
+    def load_model(self, path, device, half=False, verbose=False, **kwargs):
+        logging.disable(logging.CRITICAL)
+
+        # Load the model
+        model = torch.hub.load("hub", "custom", path=path, source="local", force_reload=True, verbose=verbose)
+
+        # Set model parameters
+        parameters = [ConfigIO.CONFIDENCE, ConfigIO.IOU, ConfigIO.MAX_DET, ConfigIO.AGNOSTIC, ConfigIO.MULTI_LABEL, ConfigIO.AMP]
+        for param in parameters:
+            setattr(model, param, kwargs.get(param, self.config[param]))
+
+        # Move the model to the specified device
         model.to(device)
+
+        # Convert the model to half precision if specified
+        if half:
+            model.half()
+        else:
+            model.float()
+
+        # Set model names if provided
         if kwargs.get("names") is not None:
             model.names = kwargs.get("names")
+
+        logging.disable(logging.NOTSET)
+
         return model
+    
+    @staticmethod
+    def check_model_precision(model):
+        return next(model.parameters()).dtype
 
+def LoadSource(source, verbose=False):
+    if not isinstance(source, str):
+        raise ValueError("Argument 'source' must be a string.")
+    if not isinstance(verbose, bool):
+        raise ValueError("Argument 'verbose' must be a boolean.")
 
-def load_source(source, verbose=False):
     cap = cv2.VideoCapture(source)
 
     if not cap.isOpened():
@@ -92,3 +112,21 @@ def load_source(source, verbose=False):
     if verbose:
         logging.info(f"Successfully loaded source: {source}")
     return cap
+
+
+def ProfileColors(label):
+    colors = {
+        "rokok": (66, 66, 255),
+        "person": (95, 47, 5),
+    }
+    
+    return colors.get(label, (0, 0, 0))
+
+def Font(size=14, weight=QFont.Weight.Normal, antialias=False):
+    font = QFont()
+    font.setFamily("JetBrainsMono NF Medium")
+    font.setPixelSize(size)
+    font.setWeight(weight)
+    if antialias:
+        font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
+    return font

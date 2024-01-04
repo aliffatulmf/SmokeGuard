@@ -1,5 +1,5 @@
 import pathlib
 
 
-def model_path(path):
+def ModelPath(path):
     return pathlib.WindowsPath(path)

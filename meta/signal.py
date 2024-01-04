@@ -1,17 +1,7 @@
-import types
-
 from PySide6.QtCore import QObject, Signal, Slot
 from PySide6.QtGui import QPixmap
 
-
-class SnapshotNamespace(types.SimpleNamespace):
-    def __init__(self, confidence=0.0, confidence_threshold=0.0, iou_threshold=0.0, inference_time=0.0, fps=0.0, pixmap=None):
-        super().__init__(confidence=confidence, confidence_threshold=confidence_threshold, iou_threshold=iou_threshold, inference_time=inference_time, fps=fps, pixmap=pixmap)
-
-
-class ParameterNamespace(types.SimpleNamespace):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+from .namespaces import ParameterNamespace, SnapshotNamespace
 
 
 class SignalEmitter(QObject):
