@@ -1,10 +1,10 @@
 {
-    "confidence": 0.35,
-    "iou": 0.45,
-    "agnostic": false,
+    "confidence": 0.43,
+    "iou": 0.55,
+    "agnostic": true,
     "max_det": 1000,
-    "amp": true,
+    "amp": false,
     "multi_label": true,
-    "augment": true,
-    "device": "cuda"
+    "augment": false,
+    "device": "cpu"
 }

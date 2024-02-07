@@ -1,78 +1,51 @@
 import logging
-import os
-import signal
 import sys
 import textwrap
 
-from meta.exec import cleaner, run
-from meta.repo import GitHubRepository
-from meta.requirements import check_requirements
+MENU = textwrap.dedent("""Smoker Control Panel
 
-HEADER = """
-███████ ███    ███  ██████  ██   ██ ███████      ██████  ██    ██  █████  ██████  ██████
-██      ████  ████ ██    ██ ██  ██  ██          ██       ██    ██ ██   ██ ██   ██ ██   ██
-███████ ██ ████ ██ ██    ██ █████   █████       ██   ███ ██    ██ ███████ ██████  ██   ██
-     ██ ██  ██  ██ ██    ██ ██  ██  ██          ██    ██ ██    ██ ██   ██ ██   ██ ██   ██
-███████ ██      ██  ██████  ██   ██ ███████      ██████  ████████ ██   ██ ██   ██ ██████
-[italic][bold red]Control Panel[/bold red] [underline]based on[/underline] [bold blue]Ultralytics/YOLOv5[/bold blue][/italic]
-"""
-
-
-def main():
-    from rich.console import Console
-    console = Console()
-    
-    arg = sys.argv[1] if len(sys.argv) > 1 else "help"
-
-    MENU = textwrap.dedent("""
-    [bold yellow]options:[/bold yellow]
-        [green]run[/green]         - start the program
-        [green]clean[/green]       - clean the cache to free up storage
-        [green]help[/green]        - show this help message and exit
+options:
+    run             - start the program
+    clean           - clean the cache to free up storage
+    help, --help    - show this help message and exit
     """)
 
-    OPTIONS = {
-        "run": run,
-        "clean": cleaner,
-        "help": lambda: console.print(MENU),
-        "h": lambda: console.print(MENU),
-        "-h": lambda: console.print(MENU),
-    }
+def setup_hub():
+    import os
+    import shutil
 
-    try:
-        OPTIONS[arg]()
-    except KeyError:
-        logging.critical(f"Option '{arg}' is not recognized. Use 'help' to see the available options.")
-        exit(1)        
+    if not os.path.exists("hub"):
+        from git import Repo
 
-def setup_logging():
+        os.makedirs("hub", 777)
+        repo_url = "https://github.com/ultralytics/yolov5"
+        repo = Repo.clone_from(repo_url, "hub")
+
+    if not os.path.exists("utils"):
+        shutil.move("hub/utils", "utils")
+    
+    if not os.path.exists("models"):
+        shutil.move("hub/models", "models")
+    
+    if not os.path.exists("export.py"):
+        shutil.move("hub/export.py", ".")
+ 
+if __name__ == "__main__":
+    setup_hub()
     from rich.logging import RichHandler
 
-    logger = logging.getLogger()
-    logger.handlers.clear()
+    logging.basicConfig(
+        level=logging.NOTSET,
+        format="%(message)s",
+        datefmt="[%X]", handlers=[RichHandler(omit_repeated_times=False)],
+    )
 
-    # Check if a RichHandler already exists to avoid adding it multiple times
-    if not any(isinstance(handler, RichHandler) for handler in logger.handlers):
-        rich_handler = RichHandler(show_path=True, markup=True, show_time=True)
-        logger.addHandler(rich_handler)
+    arg = sys.argv[1] if len(sys.argv) > 1 else "help"
 
-    logger.setLevel(logging.NOTSET)
-    
-def signal_handler(sig, frame):
-    pid = os.getpid()
-    os.kill(pid, signal.SIGTERM)
-
-if __name__ == "__main__":
-    signal.signal(signal.SIGINT, signal_handler)
-
-    try:
-        check_requirements(["rich", "gitpython"], auto=True)
-    except Exception as e:
-        print(f"An error occurred while checking requirements: {e}")
-        exit(1)
-        
-    repo = GitHubRepository("ultralytics/yolov5", "hub")
-    repo.clone()
-    
-    setup_logging()
-    main()
+    if arg.lower() in ["help", "--help"]:
+        print(MENU)
+    elif arg.lower() == "run":
+        from meta.exec import window
+        window()
+    else:
+        print(MENU)

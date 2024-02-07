@@ -1,119 +1,199 @@
-import logging
+"""
+Meta Inference
+
+This module contains the Inference class, which is a QObject that handles the inference process for a given model.
+"""
+import os
+from queue import Queue
 
 import cv2
+import torch
+from models.common import DetectMultiBackend
+from PySide6.QtCore import QObject, Signal
+from ultralytics.utils.plotting import Annotator, colors
+from utils.dataloaders import LoadImages, LoadStreams
+from utils.general import (Profile, check_img_size, check_imshow,
+                           non_max_suppression, scale_boxes)
 
-from meta import CONFIG_READ
-from meta.counter.fps import FPS
-from meta.counter.general import CounterInt
-from meta.counter.inference_time import InferenceTime
-from meta.device.cuda import GetDevice
-from meta.image.manipulation import FrameToPixmap, ResizeFrame
-from meta.io import ConfigIO, LoadSource, ModelHub, ProfileColors
-from meta.model.path import ModelPath
-from meta.signal import ParameterNamespace, SignalEmitter, SnapshotNamespace
-from meta.thread import StopControl
+from meta import CONFIG_JSON
+from meta.cuda import get_cuda_devices
+from meta.fps import FPS, FPSStats
+from meta.frame import image_to_qpixmap, resize_scale
+from meta.inference import InferenceTime, InferenceTimeStats
+from meta.io import ConfigIO
+from meta.schema import PARAMETER_SCHEMA, SNAPSHOT_SCHEMA
 
 
-class Inference(StopControl):
-    def __init__(self, **kwargs):
+class Inference(QObject):
+    """
+    The Inference class is a QObject that handles the inference process for a given model.
+
+    Attributes:
+        CAMERA_SIG (Signal): Signal to emit the camera frame.
+        SNAPSHOT_SIG (Signal): Signal to emit the snapshot data.
+        PARAMETER_SIG (Signal): Signal to emit the parameter data.
+
+    Methods:
+        __init__(weights, source, half, floating_point, limit, **kwargs): Initializes the Inference object with the given parameters.
+    """
+
+    CAMERA_SIG = Signal(object)
+    SNAPSHOT_SIG = Signal(object)
+    PARAMETER_SIG = Signal(object)
+
+    def __init__(self,
+                 weights,
+                 source,
+                 half=False,
+                 floating_point=torch.float32,
+                 limit=100,
+                 **kwargs):
+        """
+        Initializes the Inference object with the given parameters.
+
+        Args:
+            weights (str): The path to the weights file for the model.
+            source (str): The source of the input data (file path or camera device).
+            half (bool, optional): Whether to use half precision. Defaults to False.
+            floating_point (torch.dtype, optional): The floating point precision to use for the model. Defaults to torch.float32.
+            limit (int, optional): The maximum size of the snapshot queue. Defaults to 100.
+        """
         super().__init__()
 
-        self.device, self.hw_brand = GetDevice(kwargs["device"], verbose=kwargs["verbose"])
-        self.verbose = kwargs["verbose"]
-        self.source = kwargs["source"]
-        self.single = kwargs["single"]
-        self.half = kwargs["half"]
+        # Hardware and device configuration
+        self.device = get_cuda_devices()
+        self.fp = floating_point
 
-        self.models = [ModelPath("weights/model.pt"), ModelPath("weights/general.pt")]
-        self.emitter = SignalEmitter()
-        self.model_hub = ModelHub()
-        self.config = CONFIG_READ
-        self.loaded_models = []
+        # Statistics
+        self.__inference_stats = InferenceTimeStats()
+        self.__fps_stats = FPSStats()
+        self.__snapshot_queue = Queue(limit)
 
-        single_model_kwgs = {"names": ["rokok"]}
-        multiple_model_kwgs = {"confidence": 0.60, "iou": 0.45, "agnostic": False,
-                               "max_det": 1000, "multi_label": True, "augment": False, "amp": True, }
+        # Model and source configuration
+        self.source = source
+        self.__model = DetectMultiBackend(weights, self.device, fp16=half)
+        self.__model.names = ["rokok"]
 
-        if self.verbose:
-            logging.info("Loading single model") if self.single else logging.info("Loading multiple models")
+        # Runtime control
+        self.__stop_flag = False
 
-        self.loaded_models = [self.model_hub.load_model(model, self.device, self.half, **(
-            single_model_kwgs if i != 1 else multiple_model_kwgs)) for i, model in enumerate(self.models) if not self.single or i == 0]
-        
-        self.capture = LoadSource(self.source, self.verbose)
-        if self.capture is None:
-            raise ValueError("Failed to load source")
+    def stop_loop(self):
+        """
+        Stops the loop by setting the stop flag to True and returns the updated stop flag.
+        """
+        self.__stop_flag = True
+        return self.__stop_flag
 
     def run(self):
-        frames_per_second = FPS()
-        inference_time = InferenceTime()
-        frame_counter = CounterInt()
-        fp = ModelHub.check_model_precision(self.loaded_models[0])
+        """
+        Run the inference process on the input data and emit signals with the inference results.
+        """
+        global annotator, det
 
-        while self.capture.isOpened() and not self.stop_requested:
-            snapshot_checkpoint = []
-            object_detected = 0
-            frames_per_second.start()
-            retrieval_successful, frame = self.capture.read()
+        stride, names, pt = self.__model.stride, self.__model.names, self.__model.pt
+        imgsz = check_img_size((640, 640))  # check img_size
 
-            if not retrieval_successful:
-                break
+        batch_size = 1
+        if self.source.isdigit():
+            check_imshow(warn=True)
+            dataset = LoadStreams(self.source, img_size=imgsz, stride=stride, auto=pt)
+            batch_size = len(dataset)
+        elif os.path.isfile(self.source):
+            dataset = LoadImages(self.source, img_size=imgsz, stride=stride, auto=pt)
 
-            frame_counter.tap()
+        self.__model.warmup(imgsz=(1 if pt else batch_size, 3, *imgsz))
+        seen, dt = 0, (Profile(device=self.device), Profile(device=self.device), Profile(device=self.device))
 
-            for model in self.loaded_models:
-                inference_time.start()
-                predictions = model(frame).pandas().xyxy
-                inference_time.stop()
+        for _, im, im0s, _, s in dataset:
+            if self.__stop_flag:
+                return
 
-                for prediction in predictions:
-                    if prediction.empty:
-                        continue
+            # start counting
+            fps, inf = FPS(), InferenceTime()
+            fps.start(), inf.start()
 
-                    for objects in prediction.to_numpy():
-                        if objects[6] not in ["rokok", "person"]:
-                            continue
-                        object_detected += 1
+            with dt[0]:
+                im = torch.from_numpy(im).to(self.device)
+                im = im.float()  # fp32
+                im /= 255
+                if len(im.shape) == 3:
+                    im = im[None]
 
-                        x_min, y_min, x_max, y_max, confidence, _, name = objects
-                        x_min, y_min, x_max, y_max = map(int, [x_min, y_min, x_max, y_max])
+            with dt[1]:
+                pred = self.__model(im, augment=CONFIG_JSON[ConfigIO.AUGMENT])
 
-                        detection_text = f"{name} {round(confidence * 100)}%"
-                        text_size, _ = cv2.getTextSize(detection_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)
-                        text_width, text_height = text_size[0] + 15, text_size[1] + 25
+            with dt[2]:
+                pred = non_max_suppression(prediction=pred,
+                                           conf_thres=CONFIG_JSON[ConfigIO.CONFIDENCE],
+                                           iou_thres=CONFIG_JSON[ConfigIO.IOU],
+                                           agnostic=CONFIG_JSON[ConfigIO.AGNOSTIC],
+                                           max_det=CONFIG_JSON[ConfigIO.MAX_DET])
 
-                        cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), ProfileColors(name), 3)
-                        cv2.rectangle(frame, (x_min - 2, y_min), (x_min + text_width, y_min - text_height), ProfileColors(name), -1)
-                        cv2.putText(frame, detection_text, (x_min + 10, y_min - 15), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+            # stop counting inference time
+            inf.stop()
+            self.__inference_stats.add_time(inf.elapsed)  # add inference time to stats
 
-                        pixmap = FrameToPixmap(ResizeFrame(frame, scale=0.4))
-                        snapshot = SnapshotNamespace(
-                            confidence=confidence,
-                            inference_time=inference_time.stats,
-                            pixmap=pixmap,
-                        )
-                        snapshot_checkpoint.append(snapshot)
+            for i, det in enumerate(pred):
+                seen += 1  # object detected
 
-            frames_per_second.stop()
+                if self.source == "0":
+                    im0 = im0s[i].copy()
+                else:
+                    im0 = im0s.copy()
 
-            for snapshot in snapshot_checkpoint:
-                snapshot.fps = frames_per_second.stats
-                snapshot.confidence_threshold = self.config[ConfigIO.CONFIDENCE]
-                snapshot.iou_threshold = self.config[ConfigIO.IOU]
-                snapshot.accelerator = "CUDA" if "cuda" in self.device else "CPU"
-                snapshot.hw_brand = self.hw_brand
-                snapshot.floating_point = fp
+                s += "%gx%g " % im.shape[2:]
+                annotator = Annotator(im0, line_width=4, font_size=50, pil=True, example=str(names))
 
-                self.emitter.emit_snapshot_signal(snapshot_checkpoint.pop(0))
+                if len(det):
+                    det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
-            pixmap = FrameToPixmap(ResizeFrame(frame, scale=0.5))
-            self.emitter.emit_camera_signal(pixmap)
+                    conf_sum = sum(det[:, 4].float())
+                    conf_avg = (conf_sum / len(det)).item()  # average confidence
 
-            parameters = ParameterNamespace(
-                frames=frame_counter.size(),
-                fps=frames_per_second.stats,
-                inference=inference_time.stats,
-                total_object=object_detected,
-            )
+                    for *xyxy, conf, cls in reversed(det):
+                        c = int(cls)
+                        label = f"{names[c]} {round(conf.item() * 100)}%"
+                        annotator.box_label(xyxy, label, color=colors(c, True))
 
-            self.emitter.emit_parameter_signal(parameters)
+                    frame = cv2.cvtColor(annotator.result(), cv2.COLOR_BGR2RGB)
+                    resized = resize_scale(frame, 0.6)
+                    pixmap = image_to_qpixmap(resized)
+
+                    snapshot = SNAPSHOT_SCHEMA.copy()
+                    snapshot["confidence"] = conf_avg
+                    snapshot["threshold"]["confidence"] = CONFIG_JSON[ConfigIO.CONFIDENCE]
+                    snapshot["threshold"]["iou"] = CONFIG_JSON[ConfigIO.IOU]
+                    snapshot["inference"]["min"] = self.__inference_stats.min_time
+                    snapshot["inference"]["max"] = self.__inference_stats.max_time
+                    snapshot["inference"]["avg"] = self.__inference_stats.avg_time
+                    snapshot["image"]["qpixmap"] = pixmap
+                    snapshot["floating_point"] = self.fp
+                    snapshot["hardware"] = "NVIDIA RTX 4090"
+                    self.__snapshot_queue.put(snapshot)
+
+            fps.update()
+            self.__fps_stats.add_fps(fps.frame_rate)
+
+            frame = cv2.cvtColor(annotator.result(), cv2.COLOR_BGR2RGB)
+            resized = resize_scale(frame, 0.5)
+            self.CAMERA_SIG.emit(image_to_qpixmap(resized))
+
+            parameter = PARAMETER_SCHEMA.copy()
+            parameter["frames"] = seen
+            parameter["fps"]["current"] = fps.frame_rate
+            parameter["fps"]["min"] = self.__fps_stats.min_fps
+            parameter["fps"]["max"] = self.__fps_stats.max_fps
+            parameter["fps"]["avg"] = self.__fps_stats.avg_fps
+            parameter["inference"]["current"] = inf.elapsed
+            parameter["inference"]["min"] = self.__inference_stats.min_time
+            parameter["inference"]["max"] = self.__inference_stats.max_time
+            parameter["inference"]["avg"] = self.__inference_stats.avg_time
+            parameter["total_object"] = len(det)
+            self.PARAMETER_SIG.emit(parameter)
+
+            if not self.__snapshot_queue.empty():
+                snapshot = self.__snapshot_queue.get()
+                snapshot["fps"]["min"] = self.__fps_stats.min_fps
+                snapshot["fps"]["max"] = self.__fps_stats.max_fps
+                snapshot["fps"]["avg"] = self.__fps_stats.avg_fps
+                self.SNAPSHOT_SIG.emit(snapshot)
