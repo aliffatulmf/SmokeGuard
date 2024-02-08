@@ -17,7 +17,7 @@ py-cpuinfo
 pyqt5
 requests
 rich
-scipyw
+scipy
 seaborn
 setuptools
 thop
