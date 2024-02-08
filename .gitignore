@@ -4,5 +4,9 @@
 .virtual_documents/
 
 __pycache__/
+hub/
+utils/
+models/
+weights/
 
-weights
+export.py

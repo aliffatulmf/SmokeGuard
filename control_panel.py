@@ -1,6 +1,9 @@
 import logging
+import os
 import sys
 import textwrap
+
+from rich.logging import RichHandler
 
 MENU = textwrap.dedent("""Smoker Control Panel
 
@@ -9,6 +12,7 @@ options:
     clean           - clean the cache to free up storage
     help, --help    - show this help message and exit
     """)
+
 
 def setup_hub():
     import os
@@ -23,16 +27,16 @@ def setup_hub():
 
     if not os.path.exists("utils"):
         shutil.move("hub/utils", "utils")
-    
+
     if not os.path.exists("models"):
         shutil.move("hub/models", "models")
-    
+
     if not os.path.exists("export.py"):
         shutil.move("hub/export.py", ".")
- 
+
+
 if __name__ == "__main__":
     setup_hub()
-    from rich.logging import RichHandler
 
     logging.basicConfig(
         level=logging.NOTSET,
@@ -44,6 +48,9 @@ if __name__ == "__main__":
 
     if arg.lower() in ["help", "--help"]:
         print(MENU)
+    elif arg.lower() == "clean":
+        from meta.cache import clean_cache_dir
+        clean_cache_dir(".")
     elif arg.lower() == "run":
         from meta.exec import window
         window()
