@@ -73,13 +73,36 @@ def resize_scale(image, scale):
 
     # Ensure the scale does not change the aspect ratio
     if new_w / new_h != w / h:
-        raise ValueError("Scale is not valid, it will change the aspect ratio of the image.")
+        new_w, new_h = correct_aspect_ratio(w, h, scale)
 
     try:
         resized_image = cv2.resize(image, (new_w, new_h))
     except cv2.error as e:
         raise RuntimeError("Error occurred while resizing the image: " + str(e))
     return resized_image
+
+
+def check_aspect_ratio(org_w, org_h, new_w, new_h, tolerance=0.01):
+    ratio_original = org_w / org_h
+    ratio_new = new_w / new_h
+    difference = abs(ratio_original - ratio_new)
+    return difference <= tolerance
+
+
+def correct_aspect_ratio(orig_w, orig_h, scale):
+    new_w = round(orig_w * scale)
+    new_h = round(orig_h * scale)
+    new_w = min(new_w, orig_w)
+    new_h = min(new_h, orig_h)
+    
+    if not check_aspect_ratio(orig_w, orig_h, new_w, new_h):
+        orig_ratio = orig_w / orig_h
+        if orig_ratio > new_w / new_h:
+            new_h = round(new_w / orig_ratio)
+        else:
+            new_w = round(new_h * orig_ratio)
+
+    return new_w, new_h
 
 
 # WARNING: EXPERIMENTAL

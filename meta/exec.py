@@ -1,5 +1,6 @@
 import argparse
 import sys
+import os
 
 from PySide6.QtWidgets import QApplication
 
@@ -16,6 +17,10 @@ def window():
     parser.add_argument("--models", nargs="+", default=[], help="specify models")
     parser.add_argument("--maxlim", type=int, default=50, help="set the maximum snapshot limit. use 0 for no limit.")
     args = parser.parse_args(sys.argv[2:])
+    
+    if not os.path.exists(args.source) and not os.path.isfile(args.source):
+        print("invalid source")
+        exit(1)
 
     param = vars(args)
     
