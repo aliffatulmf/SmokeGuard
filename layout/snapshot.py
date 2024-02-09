@@ -138,25 +138,41 @@ class SnapshotWindow(Layout):
 
     @staticmethod
     def extract_data_pairs(data):
-        conf = f": {data['confidence'] * 100:.2f}% ({round(data['confidence'] * 100)}%)"
-        conf_thres = f": {data['threshold']['confidence']} / {data['threshold']['iou']}"
-        inf_time = f": {data['inference']['min']:.2f}ms [AVG {data['inference']['avg']:.2f}ms]"
-        fps = f": {int(data['fps']['min'])} [AVG {int(data['fps']['avg'])}]"
-        floating_point = {
-            torch.float16: "FP16 [Half Precision]",
-            torch.float32: "FP32 [Single Precision]",
-            torch.float64: "FP64 [Double Precision]"
-        }.get(data['floating_point'], "")
-
+        def format_confidence(confidence):
+            percentage = confidence *  100
+            return f"{percentage:.2f}% ({round(percentage)}%)"
+        
+        def format_threshold(threshold):
+            return f"{threshold['confidence']} / {threshold['iou']}"
+        
+        def format_inference_time(inference):
+            min_time = inference['min']
+            avg_time = inference['avg']
+            return f"{min_time:.2f}ms [AVG {avg_time:.2f}ms]"
+        
+        def format_fps(fps_data):
+            current_fps = int(fps_data['current'])
+            avg_fps = int(fps_data['avg'])
+            return f"{current_fps} [AVG {avg_fps}]"
+        
+        def format_floating_point(fp_type):
+            mapping = {
+                torch.float16: "FP16 [Half Precision]",
+                torch.float32: "FP32 [Single Precision]",
+                torch.float64: "FP64 [Double Precision]"
+            }
+            return mapping.get(fp_type, "")
+        
         dataset = [
-            ("Confidence Average", conf),
-            ("Confidence / IoU Threshold", conf_thres),
-            ("Inference Time", inf_time),
-            ("FPS", fps),
-            ("Floating Point", f": {floating_point}"),
+            ("Confidence Average", format_confidence(data['confidence'])),
+            ("Confidence / IoU Threshold", format_threshold(data['threshold'])),
+            ("Inference Time", format_inference_time(data['inference'])),
+            ("FPS", format_fps(data['fps'])),
+            ("Floating Point", format_floating_point(data['floating_point'])),
         ]
 
         return dataset
+
 
     def parse_labels_values(self, dataset, left, right):
         labels = []

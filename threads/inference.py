@@ -8,12 +8,8 @@ from queue import Queue
 
 import cv2
 import torch
-from models.common import DetectMultiBackend
 from PySide6.QtCore import QObject, Signal
 from ultralytics.utils.plotting import Annotator, colors
-from utils.dataloaders import LoadImages, LoadStreams
-from utils.general import (Profile, check_img_size, check_imshow,
-                           non_max_suppression, scale_boxes)
 
 from meta import CONFIG_JSON
 from meta.cuda import get_cuda_devices
@@ -22,6 +18,10 @@ from meta.frame import image_to_qpixmap, resize_scale
 from meta.inference import InferenceTime, InferenceTimeStats
 from meta.io import ConfigIO
 from meta.schema import PARAMETER_SCHEMA, SNAPSHOT_SCHEMA
+from models.common import DetectMultiBackend
+from utils.dataloaders import LoadImages, LoadStreams
+from utils.general import (Profile, check_img_size, check_imshow,
+                           non_max_suppression, scale_boxes)
 
 
 class Inference(QObject):
@@ -193,6 +193,7 @@ class Inference(QObject):
 
             if not self.__snapshot_queue.empty():
                 snapshot = self.__snapshot_queue.get()
+                snapshot["fps"]["current"] = fps.frame_rate
                 snapshot["fps"]["min"] = self.__fps_stats.min_fps
                 snapshot["fps"]["max"] = self.__fps_stats.max_fps
                 snapshot["fps"]["avg"] = self.__fps_stats.avg_fps

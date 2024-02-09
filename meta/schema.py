@@ -11,11 +11,13 @@ SNAPSHOT_SCHEMA = {
         "iou": 0.0,
     },
     "inference": {
+        "current": 0.0,
         "min": 0.0,
         "max": 0.0,
         "avg": 0.0,
     },
     "fps": {
+        "current": 0.0,
         "min": 0.0,
         "max": 0.0,
         "avg": 0.0,
