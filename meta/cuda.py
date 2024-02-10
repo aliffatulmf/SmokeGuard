@@ -55,6 +55,7 @@ def get_cuda_devices(device_specifier=None):
 
     # if the argument is a list, return CUDA devices whose numbers are in the list
     elif isinstance(device_specifier, list):
+        device_specifier = [i if i >= 0 else (i + DETECTED_CUDA_DEVICES) for i in device_specifier]
         for i in device_specifier:
             if i >= DETECTED_CUDA_DEVICES:
                 raise ValueError("Device number exceeds the total number of CUDA devices.")
