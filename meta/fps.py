@@ -18,6 +18,7 @@ class FPS:
         __start_time: The time when the FPS measurement started.
         __frame_count: The number of frames counted since the start of the measurement.
         __fps: The calculated frames per second.
+        __min_time: The minimum time between frames, in seconds.
 
     Example:
         >>> fps = FPS()
@@ -27,42 +28,31 @@ class FPS:
         >>> print(f"Current FPS: {fps.frame_rate}")
     """
 
-    def __init__(self):
+    def __init__(self, min_time=0.01):
         """
         Initialize the FPS with the start time as None, frame count as 0, and fps as 0.
         """
-        self.__start_time = None
+        self.__last_update_time = None
         self.__frame_count = 0
         self.__fps = 0
+        self.__min_time = min_time
 
     def start(self):
         """
         Start the FPS measurement by setting the start time to the current time.
         """
-        self.__start_time = time.time()
+        self.__last_update_time = time.time()
 
     def update(self):
         """
-        Update the FPS measurement by incrementing the frame count and calculating the current FPS.
+        Update the FPS measurement by incrementing the frame count, calculating the elapsed time
+        since the last update, and updating the FPS value if enough time has passed.
         """
         self.__frame_count += 1
-        duration = time.time() - self.__start_time
-        if duration != 0:
+        duration = time.time() - self.__last_update_time
+        if duration >=  self.__min_time:
             self.__fps = self.__frame_count / duration
-        else:
-            self.__fps = 0
-
-    def pause(self):
-        """
-        Pause the FPS measurement by decrementing the frame count.
-        """
-        self.__frame_count -= 1
-
-    def resume(self):
-        """
-        Resume the FPS measurement by incrementing the frame count.
-        """
-        self.__frame_count += 1
+            self.__last_update_time = time.time()
 
     @property
     def frame_rate(self):
@@ -147,4 +137,6 @@ class FPSStats:
         Returns:
             The average FPS value, or None if no FPS values have been added.
         """
+        if not self.fps_values:
+            return 0
         return sum(self.fps_values) / len(self.fps_values) if self.fps_values else None
