@@ -22,7 +22,7 @@ class ConfigIO:
     def __init__(self, name="config.json"):
         self.name = name
         self.values: dict = self.__read(name)
-        
+
     @property
     def default(self):
         return {
@@ -60,7 +60,10 @@ class ConfigIO:
         """
         if key not in self.values:
             raise KeyError(f"{key} is not a valid key")
-
+        
+        if not isinstance(value, type(self.values[key])):
+            raise ValueError(f"Value must be of type {type(self.values[key])}")
+        
         self.values[key] = value
         self.__write(self.name, self.values)
 
@@ -69,37 +72,43 @@ class ConfigIO:
         """
         Check any errors on the keys and value.
         """
-        pairs = (
-                {"key": self.CONFIDENCE, "type": float},
-                {"key": self.IOU, "type": float},
-                {"key": self.AGNOSTIC, "type": bool},
-                {"key": self.MAX_DET, "type": int},
-                {"key": self.AMP, "type": bool},
-                {"key": self.MULTI_LABEL, "type": bool},
-                {"key": self.AUGMENT, "type": bool},
-                )
-        
-        reader = self.__read(self.name)
+        pairs = [
+            {"key": self.CONFIDENCE, "type": float},
+            {"key": self.IOU, "type": float},
+            {"key": self.AGNOSTIC, "type": bool},
+            {"key": self.MAX_DET, "type": int},
+            {"key": self.AMP, "type": bool},
+            {"key": self.MULTI_LABEL, "type": bool},
+            {"key": self.AUGMENT, "type": bool},
+        ]
 
-        for key in reader.keys():
-            if key not in pairs:
+        for key in self.values.keys():
+            if key not in [pair["key"] for pair in pairs]:
                 raise KeyError(f"{key} is required.")
-
-
+            
+            for pair in pairs:
+                if not isinstance(self.values[key], pair["type"]):
+                    raise ValueError(f"{key} must be of type {pair['type']}")
 
     def writes(self, values):
         """
         Write multiple keys to the configuration file.
         """
+        for key, value in values.items():
+            if key not in self.values:
+                raise KeyError(f"{key} is not a valid key")
+
+            if not isinstance(value, type(self.values[key])):
+                raise ValueError(f"Value must be of type {type(self.values[key])}")
+        
         self.values.update(values)
         self.__write(self.name, self.values)
 
-    @staticmethod
-    def __read(name):
+    def __read(self, name):
         with open(name, "r", CFG_BUFFER_SIZE, CFG_ENCODING) as f:
             return json.load(f)
 
     def __write(self, name, values):
         with open(name, "w", CFG_BUFFER_SIZE, CFG_ENCODING) as f:
             json.dump(values, f, indent=4)
- 
+

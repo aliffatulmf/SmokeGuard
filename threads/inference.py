@@ -25,18 +25,6 @@ from utils.general import (Profile, check_img_size, check_imshow,
 
 
 class Inference(QObject):
-    """
-    The Inference class is a QObject that handles the inference process for a given model.
-
-    Attributes:
-        CAMERA_SIG (Signal): Signal to emit the camera frame.
-        SNAPSHOT_SIG (Signal): Signal to emit the snapshot data.
-        PARAMETER_SIG (Signal): Signal to emit the parameter data.
-
-    Methods:
-        __init__(weights, source, half, floating_point, limit, **kwargs): Initializes the Inference object with the given parameters.
-    """
-
     CAMERA_SIG = Signal(object)
     SNAPSHOT_SIG = Signal(object)
     PARAMETER_SIG = Signal(object)
@@ -48,50 +36,30 @@ class Inference(QObject):
                  floating_point=torch.float32,
                  limit=100,
                  **kwargs):
-        """
-        Initializes the Inference object with the given parameters.
-
-        Args:
-            weights (str): The path to the weights file for the model.
-            source (str): The source of the input data (file path or camera device).
-            half (bool, optional): Whether to use half precision. Defaults to False.
-            floating_point (torch.dtype, optional): The floating point precision to use for the model. Defaults to torch.float32.
-            limit (int, optional): The maximum size of the snapshot queue. Defaults to 100.
-        """
         super().__init__()
 
-        # Hardware and device configuration
         self.device = get_cuda_devices()
         self.fp = floating_point
 
-        # Statistics
         self.__inference_stats = InferenceTimeStats()
         self.__fps_stats = FPSStats()
         self.__snapshot_queue = Queue(limit)
 
-        # Model and source configuration
         self.source = source
         self.__model = DetectMultiBackend(weights, self.device, fp16=half)
         self.__model.names = ["rokok"]
 
-        # Runtime control
         self.__stop_flag = False
 
     def stop_loop(self):
-        """
-        Stops the loop by setting the stop flag to True and returns the updated stop flag.
-        """
         self.__stop_flag = True
         return self.__stop_flag
 
     def run(self):
-        """
-        Run the inference process on the input data and emit signals with the inference results.
-        """
         global annotator, det
 
         stride, names, pt = self.__model.stride, self.__model.names, self.__model.pt
-        imgsz = check_img_size((640, 640))  # check img_size
+        imgsz = check_img_size((640, 640))
 
         batch_size = 1
         if self.source.isdigit():
@@ -129,12 +97,11 @@ class Inference(QObject):
                                            agnostic=CONFIG_JSON[ConfigIO.AGNOSTIC],
                                            max_det=CONFIG_JSON[ConfigIO.MAX_DET])
 
-            # stop counting inference time
             inf.stop()
-            self.__inference_stats.add_time(inf.elapsed)  # add inference time to stats
+            self.__inference_stats.add_time(inf.elapsed)
 
             for i, det in enumerate(pred):
-                seen += 1  # object detected
+                seen += 1
 
                 if self.source == "0":
                     im0 = im0s[i].copy()
@@ -148,7 +115,7 @@ class Inference(QObject):
                     det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
                     conf_sum = sum(det[:, 4].float())
-                    conf_avg = (conf_sum / len(det)).item()  # average confidence
+                    conf_avg = (conf_sum / len(det)).item()
 
                     for *xyxy, conf, cls in reversed(det):
                         c = int(cls)
