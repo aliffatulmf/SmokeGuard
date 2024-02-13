@@ -21,6 +21,8 @@ def setup_hub():
     if not os.path.exists("hub"):
         from git import Repo
 
+        print("="*10, "CLONE YOLOv5", "="*10)
+        
         os.makedirs("hub", 777)
         repo_url = "https://github.com/ultralytics/yolov5"
         repo = Repo.clone_from(repo_url, "hub")

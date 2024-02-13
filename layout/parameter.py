@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QComboBox, QFrame, QGroupBox, QLabel,
                                QPushButton, QSpinBox, QVBoxLayout)
 
 from meta import CONFIG_JSON
+from meta.cuda import DETECTED_CUDA_DEVICES
 from meta.io import ConfigIO
 
 font = QFont()
@@ -42,7 +43,7 @@ class Parameter(QFrame):
 
         self.device_inp = QComboBox()
         self.device_inp.addItems(["CUDA", "CPU"])
-        self.device_inp.setCurrentText("CUDA")
+        self.device_inp.setCurrentText("CUDA" if DETECTED_CUDA_DEVICES else "CPU")
         self.device_inp.setDisabled(True)
 
         self.agnostic_inp = QComboBox()
