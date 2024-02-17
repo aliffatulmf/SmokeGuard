@@ -101,4 +101,3 @@ class ThreadManager:
     @property
     def is_running(self):
         return self.running
-

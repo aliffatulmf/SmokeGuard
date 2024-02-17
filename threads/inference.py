@@ -7,7 +7,7 @@ import os
 from queue import Queue
 
 import cv2
-import torch
+from torch import float32, from_numpy
 from PySide6.QtCore import QObject, Signal
 from ultralytics.utils.plotting import Annotator, colors
 
@@ -33,32 +33,29 @@ class Inference(QObject):
                  weights,
                  source,
                  half=False,
-                 floating_point=torch.float32,
-                 limit=100,
-                 **kwargs):
+                 floating_point=float32,
+                 limit=100):
         super().__init__()
 
         self.device = get_cuda_devices()
         self.fp = floating_point
 
-        self.__inference_stats = InferenceTimeStats()
-        self.__fps_stats = FPSStats()
-        self.__snapshot_queue = Queue(limit)
+        self.inference_stat = InferenceTimeStats()
+        self.fps_stats = FPSStats()
+        self.snapshot_queue = Queue(limit)
 
         self.source = source
-        self.__model = DetectMultiBackend(weights, self.device, fp16=half)
-        self.__model.names = ["rokok"]
+        self.model = DetectMultiBackend(weights, self.device, fp16=half)
+        self.model.names = ["rokok"]
 
-        self.__stop_flag = False
+        self.stop_flag = False
 
     def stop_loop(self):
-        self.__stop_flag = True
-        return self.__stop_flag
+        self.stop_flag = True
+        return self.stop_flag
 
     def run(self):
-        global annotator, det
-
-        stride, names, pt = self.__model.stride, self.__model.names, self.__model.pt
+        stride, names, pt = self.model.stride, self.model.names, self.model.pt
         imgsz = check_img_size((640, 640))
 
         batch_size = 1
@@ -69,11 +66,11 @@ class Inference(QObject):
         elif os.path.isfile(self.source):
             dataset = LoadImages(self.source, img_size=imgsz, stride=stride, auto=pt)
 
-        self.__model.warmup(imgsz=(1 if pt else batch_size, 3, *imgsz))
+        self.model.warmup(imgsz=(1 if pt else batch_size, 3, *imgsz))
         seen, dt = 0, (Profile(device=self.device), Profile(device=self.device), Profile(device=self.device))
 
         for _, im, im0s, _, s in dataset:
-            if self.__stop_flag:
+            if self.stop_flag:
                 return
 
             # start counting
@@ -81,14 +78,14 @@ class Inference(QObject):
             fps.start(), inf.start()
 
             with dt[0]:
-                im = torch.from_numpy(im).to(self.device)
+                im = from_numpy(im).to(self.device)
                 im = im.float()  # fp32
                 im /= 255
                 if len(im.shape) == 3:
                     im = im[None]
 
             with dt[1]:
-                pred = self.__model(im, augment=CONFIG_JSON[ConfigIO.AUGMENT])
+                pred = self.model(im, augment=CONFIG_JSON[ConfigIO.AUGMENT])
 
             with dt[2]:
                 pred = non_max_suppression(prediction=pred,
@@ -98,7 +95,7 @@ class Inference(QObject):
                                            max_det=CONFIG_JSON[ConfigIO.MAX_DET])
 
             inf.stop()
-            self.__inference_stats.add_time(inf.elapsed)
+            self.inference_stat.add_time(inf.elapsed)
 
             for i, det in enumerate(pred):
                 seen += 1
@@ -130,16 +127,16 @@ class Inference(QObject):
                     snapshot["confidence"] = conf_avg
                     snapshot["threshold"]["confidence"] = CONFIG_JSON[ConfigIO.CONFIDENCE]
                     snapshot["threshold"]["iou"] = CONFIG_JSON[ConfigIO.IOU]
-                    snapshot["inference"]["min"] = self.__inference_stats.min_time
-                    snapshot["inference"]["max"] = self.__inference_stats.max_time
-                    snapshot["inference"]["avg"] = self.__inference_stats.avg_time
+                    snapshot["inference"]["min"] = self.inference_stat.min_time
+                    snapshot["inference"]["max"] = self.inference_stat.max_time
+                    snapshot["inference"]["avg"] = self.inference_stat.avg_time
                     snapshot["image"]["qpixmap"] = pixmap
                     snapshot["floating_point"] = self.fp
                     snapshot["hardware"] = "NVIDIA RTX 4090"
-                    self.__snapshot_queue.put(snapshot)
+                    self.snapshot_queue.put(snapshot)
 
             fps.update()
-            self.__fps_stats.add_fps(fps.frame_rate)
+            self.fps_stats.add_fps(fps.frame_rate)
 
             frame = cv2.cvtColor(annotator.result(), cv2.COLOR_BGR2RGB)
             resized = resize_scale(frame, 0.5)
@@ -148,20 +145,20 @@ class Inference(QObject):
             parameter = PARAMETER_SCHEMA.copy()
             parameter["frames"] = seen
             parameter["fps"]["current"] = fps.frame_rate
-            parameter["fps"]["min"] = self.__fps_stats.min_fps
-            parameter["fps"]["max"] = self.__fps_stats.max_fps
-            parameter["fps"]["avg"] = self.__fps_stats.avg_fps
+            parameter["fps"]["min"] = self.fps_stats.min_fps
+            parameter["fps"]["max"] = self.fps_stats.max_fps
+            parameter["fps"]["avg"] = self.fps_stats.avg_fps
             parameter["inference"]["current"] = inf.elapsed
-            parameter["inference"]["min"] = self.__inference_stats.min_time
-            parameter["inference"]["max"] = self.__inference_stats.max_time
-            parameter["inference"]["avg"] = self.__inference_stats.avg_time
+            parameter["inference"]["min"] = self.inference_stat.min_time
+            parameter["inference"]["max"] = self.inference_stat.max_time
+            parameter["inference"]["avg"] = self.inference_stat.avg_time
             parameter["total_object"] = len(det)
             self.PARAMETER_SIG.emit(parameter)
 
-            if not self.__snapshot_queue.empty():
-                snapshot = self.__snapshot_queue.get()
+            if not self.snapshot_queue.empty():
+                snapshot = self.snapshot_queue.get()
                 snapshot["fps"]["current"] = fps.frame_rate
-                snapshot["fps"]["min"] = self.__fps_stats.min_fps
-                snapshot["fps"]["max"] = self.__fps_stats.max_fps
-                snapshot["fps"]["avg"] = self.__fps_stats.avg_fps
+                snapshot["fps"]["min"] = self.fps_stats.min_fps
+                snapshot["fps"]["max"] = self.fps_stats.max_fps
+                snapshot["fps"]["avg"] = self.fps_stats.avg_fps
                 self.SNAPSHOT_SIG.emit(snapshot)

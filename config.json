@@ -3,7 +3,7 @@
     "iou": 0.55,
     "agnostic": true,
     "max_det": 1000,
-    "amp": false,
+    "amp": true,
     "multi_label": true,
     "augment": false,
     "device": "cpu"

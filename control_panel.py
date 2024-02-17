@@ -1,73 +1,109 @@
-import logging
 import os
 import sys
-import textwrap
 
-from rich.logging import RichHandler
+import meta.console as console
 
-MENU = textwrap.dedent("""
-Smoker Control Panel
+from meta.flags import NewFlag
+from meta.logger import beauty_logger
+from meta.git import setup_hub
 
-Options:
-   run             - Start the program
-   clean           - Clean the cache to free up storage
-   help, --help    - Show this help message and exit
-""")
 
-def setup_hub():
-   if not os.path.exists("hub"):
-       import shutil
+def run():
+    from argparse import ArgumentParser
 
-       import git
+    parser = ArgumentParser(prog="control_panel.py run")
+    parser.add_argument("--half", action="store_true", help="specify whether to use half precision for inference. if specified, half precision is used")
+    parser.add_argument("--source", default="0", help="specify the source for inference. the default value is 0")
+    parser.add_argument("--weights", nargs="+", default=[], help="specify weights")
+    parser.add_argument("--maxlim", type=int, default=50, help="set the maximum snapshot limit. use 0 for no limit.")
+    args = parser.parse_args(sys.argv[2:])
 
-       print("=" * 10, "CLONE YOLOv5", "=" * 10)
+    # if source is not digit and source is not a file, then throw error
+    if not args.source.isdigit() and not os.path.isfile(args.source):
+        console.print(f"[red]Error: [/red]{args.source} is not available. Please make sure the specified source available.")
 
-       os.makedirs("hub", 0o777)
-       repo_url = "https://github.com/ultralytics/yolov5"
-       repo = git.Repo.clone_from(repo_url, "hub")
+    # if weights is not empty and model is not a file, then throw error
+    if len(args.weights) != 0:
+        for model in args.weights:
+            if not os.path.isfile(model):
+                console.fatal(f"[red]Error: [/red]{model} is not found. Please make sure the specified file exists.")
+    else:
+        console.fatal("[red]Error: [/red]No weights found. Please make sure the 'weights' list is not empty.")
 
-   if not os.path.exists("utils"):
-       shutil.move("hub/utils", "utils")
+    kwargs = vars(args)
 
-   if not os.path.exists("models"):
-       shutil.move("hub/models", "models")
+    # open main window below
+    from layout.window import main_window_exec
+    main_window_exec(kwargs)
 
-   if not os.path.exists("export.py"):
-       shutil.move("hub/export.py", ".")
 
-def print_menu():
-   print(MENU)
+def check_system_requirements():
+    import platform
 
-def clean_cache():
-   from meta.cache import clean_cache_dir
-   clean_cache_dir(".")
+    if platform.system() != "Windows":
+        console.print("[red]Error: [/red]This program is only supported on Windows.")
+        sys.exit(1)
 
-def start_program():
-   from meta.exec import window
-   window()
+    if sys.maxsize < 2**32:
+        console.print("[red]Error: [/red]This program is only supported on 64-bit Windows.")
+        sys.exit(1)
+
+
+def setup(setup_only=False):
+    setup_hub()
+    console.print("Setup complete.")
+
+    if setup_only:
+        sys.exit(0)
+
+
+def reset():
+    from shutil import rmtree
+    from subprocess import check_call, CalledProcessError
+
+    try:
+        os.remove("export.py")
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        console.fatal(f"Failed to remove export.py: {e}")
+
+    if os.path.exists("hub"):
+        try:
+            # cannot use rmtree because it will throw PermissionError
+            check_call(["cmd.exe", "/c", "RMDIR", "/S", "/Q", "hub"], shell=True)
+        except CalledProcessError as e:
+            console.fatal(e)
+
+    rmtree("utils", ignore_errors=True)
+    rmtree("models", ignore_errors=True)
+
+    console.print("Reset complete.")
+
+
+def cache():
+    from meta.cache import clean_cache_dir
+
+    if clean_cache_dir(os.getcwd()):
+        console.print("Cache cleaned successfully.")
+
 
 def main():
-   setup_hub()
+    check_system_requirements()
 
-   logging.basicConfig(
-       level=logging.NOTSET,
-       format="%(message)s",
-       datefmt="[%X]",
-       handlers=[RichHandler(omit_repeated_times=False)],
-   )
+    flag = NewFlag(name="Control Panel")
+    flag.bool("run", "start the program")
+    flag.bool("clean", "clean the cache")
+    flag.bool("setup", "setup the program")
+    flag.bool("reset", "reset the program")
 
-   arg = sys.argv[1] if len(sys.argv) > 1 else "help"
+    args = flag.parse_args()
+    args.handler("run", run)
+    args.handler("clean", cache)
+    args.handler("setup", setup, True)
+    args.handler("reset", reset)
 
-   functions = {
-       "help": print_menu,
-       "clean": clean_cache,
-       "run": start_program,
-   }
-
-   if arg.lower() in functions:
-       functions[arg.lower()]()
-   else:
-       print_menu()
 
 if __name__ == "__main__":
-   main()
+    beauty_logger()
+    main()

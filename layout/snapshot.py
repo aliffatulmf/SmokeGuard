@@ -1,6 +1,6 @@
 import logging
 
-import torch
+from torch import float16, float32, float64
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QScrollArea, QVBoxLayout,
@@ -67,7 +67,8 @@ class Layout(QWidget):
 class SnapshotWindow(Layout):
     def __init__(self, maxlim):
         super().__init__()
-        assert maxlim >= 0 and maxlim <= 100, "cannot set limit to more than 100 and lower than 0"
+        if not (0 <= maxlim <=  100):
+            raise ValueError("cannot set limit to more than  100 and lower than  0")
 
         if maxlim == 0:
             logging.warning("Unrestricted snapshot limit may cause memory leaks.")
@@ -157,9 +158,9 @@ class SnapshotWindow(Layout):
         
         def format_floating_point(fp_type):
             mapping = {
-                torch.float16: "FP16 [Half Precision]",
-                torch.float32: "FP32 [Single Precision]",
-                torch.float64: "FP64 [Double Precision]"
+                float16: "FP16 [Half Precision]",
+                float32: "FP32 [Single Precision]",
+                float64: "FP64 [Double Precision]"
             }
             return mapping.get(fp_type, "")
         

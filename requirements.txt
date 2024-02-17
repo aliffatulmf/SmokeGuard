@@ -6,6 +6,7 @@ gitpython
 ipython
 matplotlib
 numpy
+cmake
 onnx
 onnx-simplifier
 onnxruntime

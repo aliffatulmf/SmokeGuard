@@ -88,22 +88,22 @@ class Parameter(QFrame):
         self.objects = QLabel("Object Detected: 0")
         self.objects.setFont(font)
 
-        self.v_fps = QLabel("0, 0, 0, 0")
-        self.v_fps.setFont(font)
-        self.v_inference = QLabel("0ms, 0ms, 0ms, 0ms")
-        self.v_inference.setFont(font)
+        self.value_fps = QLabel("0, 0, 0, 0")
+        self.value_fps.setFont(font)
+        self.value_inference = QLabel("0ms, 0ms, 0ms, 0ms")
+        self.value_inference.setFont(font)
 
-        l_fps = QLabel("FPS [Min, Max, Avg]:")
-        l_fps.setFont(font)
-        l_inf = QLabel("Inference Times [Min, Max, Avg]:")
-        l_inf.setFont(font)
+        label_fps = QLabel("FPS [Min, Max, Avg]:")
+        label_fps.setFont(font)
+        label_inf = QLabel("Inference Times [Min, Max, Avg]:")
+        label_inf.setFont(font)
 
         layout.addWidget(self.frames)
         layout.addWidget(self.objects)
-        layout.addWidget(l_fps)
-        layout.addWidget(self.v_fps)
-        layout.addWidget(l_inf)
-        layout.addWidget(self.v_inference)
+        layout.addWidget(label_fps)
+        layout.addWidget(self.value_fps)
+        layout.addWidget(label_inf)
+        layout.addWidget(self.value_inference)
 
         self.setLayout(layout)
 
@@ -114,12 +114,15 @@ class Parameter(QFrame):
         augment = self.augment_inp.currentText() == "Enable"
         amp = self.amp_inp.currentText() == "Enable"
 
+        data = {
+            ConfigIO.CONFIDENCE: confidence,
+            ConfigIO.IOU: iou,
+            ConfigIO.AGNOSTIC: agnostic,
+            ConfigIO.AUGMENT: augment,
+            ConfigIO.AMP: amp
+        }
         cfg_io = ConfigIO()
-        cfg_io.write(ConfigIO.CONFIDENCE, confidence)
-        cfg_io.write(ConfigIO.IOU, iou)
-        cfg_io.write(ConfigIO.AGNOSTIC, agnostic)
-        cfg_io.write(ConfigIO.AUGMENT, augment)
-        cfg_io.write(ConfigIO.AMP, amp)
+        cfg_io.writes(data)
 
     def reset_config(self):
         conf = int(CONFIG_JSON[ConfigIO.CONFIDENCE] * 100)
@@ -145,9 +148,9 @@ class Parameter(QFrame):
         self.objects.setFont(font)
 
         fps_text = f"{int(param['fps']['current'])}, {int(param['fps']['min'])}, {int(param['fps']['max'])}, {int(param['fps']['avg'])}"
-        self.v_fps.setText(fps_text)
-        self.v_fps.setFont(font)
+        self.value_fps.setText(fps_text)
+        self.value_fps.setFont(font)
 
         inference_text = f"{param['inference']['current']:.2f}ms, {param['inference']['min']:.2f}ms, {param['inference']['max']:.2f}ms, {param['inference']['avg']:.2f}ms"
-        self.v_inference.setText(inference_text)
-        self.v_inference.setFont(font)
+        self.value_inference.setText(inference_text)
+        self.value_inference.setFont(font)
