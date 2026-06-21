@@ -36,13 +36,13 @@ def parse_arguments():
 def main():
     opt = parse_arguments()
     
-    with Executor(opt) as e:
+    with Executor(opt) as executor:
         try:
             import funcs
-            e.target(funcs.run_func, opt.run)
-            e.target(funcs.clean_func, opt.clean)
-            e.target(funcs.install_func, opt.install_required)
-            e.target(funcs.supported_formats_func, opt.supported_formats)
+            executor.target(funcs.run_func, opt.run)
+            executor.target(funcs.clean_func, opt.clean)
+            executor.target(funcs.install_func, opt.install_required)
+            executor.target(funcs.supported_formats_func, opt.supported_formats)
         except Exception as e:
             logging.error(e)
             exit(1)

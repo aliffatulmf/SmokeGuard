@@ -38,6 +38,7 @@ class ConfigValues:
                 if isinstance(v, int):
                     return v/100 if key in ["conf", "iou"] else v
                 return v
+        raise KeyError(f"Config key '{key}' not found")
 
     def update(self, config={}, **kwargs):
         config = {**config, **kwargs}  # Merge config and kwargs
