@@ -58,7 +58,8 @@ class CameraThread(General, CameraSignal):
             model = load_model(self.kwargs["model"], device=self.kwargs["device"], verbose=True)
         except Exception as e:
             logging.critical(e)
-            exit(1)
+            self.send("EndOfDetection", True)
+            return
             
         i = 0
         if isinstance(cap, cv2.VideoCapture):

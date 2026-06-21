@@ -9,8 +9,9 @@ class ImageFrame:
         self.bytes_per_line = 3 * self.width
 
 def FQImage(imframe: ImageFrame):
+    data = imframe.frame.copy()
     return QImage(
-        imframe.frame.data,
+        data.data,
         imframe.width,
         imframe.height,
         imframe.bytes_per_line,

@@ -58,6 +58,7 @@ def check_requirements(packages, auto_install=False, requirements_file=None):
                     for line in f.readlines():
                         if line.startswith("#"):
                             continue
+                        version = ""
                         try:
                             package_name, version = line.split("==")
                         except ValueError:
