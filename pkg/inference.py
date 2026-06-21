@@ -14,6 +14,7 @@ def load_model(path, device, **kwargs):
         raise FileNotFoundError(f"Model not found: {path}")
 
     cfg = ConfigValues()
+    actual_device = device if device == "cpu" else get_device()
 
     m = torch.hub.load("cache/yolov5", "custom", path=path,
                        source="local", trust_repo=False, force_reload=True, **kwargs)
@@ -23,7 +24,7 @@ def load_model(path, device, **kwargs):
     m.multi_label = cfg.get("multi_label") == "Enable"
     m.max_det = cfg.get("max_det")
     m.amp = cfg.get("amp") == "Enable"
-    m.to(device if device == "cpu" else get_device())
+    m.to(actual_device)
 
     if kwargs.get("verbose", False):
         logging.info("Parameters:")
@@ -34,7 +35,7 @@ def load_model(path, device, **kwargs):
         logging.info(f"    Augmentation: {cfg.get('augment') == 'Enable'}")
         logging.info(f"    Max detections: {m.max_det}")
         logging.info(f"    AMP: {m.amp}")
-        logging.info(f"    Device: {device.upper()}")
+        logging.info(f"    Device: {actual_device}")
 
     return m
 
