@@ -2,6 +2,8 @@
 
 Aplikasi deteksi aktivitas merokok secara real-time dengan YOLOv5 dan antarmuka PySide6.
 
+Model tersedia di HuggingFace: [aliffatulmf/SmokeGuardModel](https://huggingface.co/aliffatulmf/SmokeGuardModel)
+
 ## Features
 
 - Deteksi objek real-time melalui webcam, file video, atau direktori gambar
