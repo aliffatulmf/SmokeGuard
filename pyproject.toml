@@ -29,8 +29,7 @@ dependencies = [
 ]
 
 [project.scripts]
-smokeguard = "app:run"
-smokeguard-cli = "control_panel:main"
+smokeguard = "app:run_gui"
 
 [project.urls]
 Homepage = "https://github.com/aliffatulmf/python-smoker"

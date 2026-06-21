@@ -14,12 +14,7 @@ from threads.camera import CameraThread
 
 def detect_end_notify(x):
     if x:
-        QMessageBox.information(
-            None,
-            "Notification",
-            "END OF DETECTION",
-            QMessageBox.StandardButton.Ok,
-        )
+        logging.info("Detection ended")
 
 class Window(QMainWindow):
     def __init__(self, **kwargs):

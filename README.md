@@ -32,53 +32,25 @@ pip install -r requirements.txt
 
 ## Usage
 
-### GUI Mode
-
-```bash
-python app.py
-```
-
-### CLI Mode
-
 ```bash
 # Jalankan dengan webcam
-python control_panel.py --run --source 0 --model weights/best.pt
+python app.py --model weights/best.pt
 
 # Jalankan dengan file video
-python control_panel.py --run --source video.mp4 --model weights/best.pt
+python app.py --model weights/best.pt --source video.mp4
 
 # Jalankan dengan direktori gambar
-python control_panel.py --run --source images/ --model weights/best.pt
+python app.py --model weights/best.pt --source images/
 
-# Gunakan CPU alih-alih CUDA
-python control_panel.py --run --source 0 --model weights/best.pt --device cpu
+# Gunakan CPU
+python app.py --model weights/best.pt --device cpu
 ```
 
-### CLI Options
+### Options
 
-| Flag                 | Keterangan                                               |
-| -------------------- | -------------------------------------------------------- |
-| `--run`              | Mulai deteksi                                            |
-| `--source`           | Sumber input (0 untuk webcam, path file, atau direktori) |
-| `--model`            | Path ke file model YOLOv5 (.pt)                          |
-| `--device`           | Perangkat pemrosesan: `cpu` atau `cuda` (default: cuda)  |
-| `--save`             | Simpan hasil deteksi                                     |
-| `--output`           | Direktori output (default: outputs)                      |
-| `--clean`            | Hapus cache untuk membebaskan memori                     |
-| `--install-required` | Instal semua dependensi                                  |
-
-## Configuration
-
-Edit `config.json` untuk mengatur parameter deteksi:
-
-```json
-{
-  "conf": 0.35,
-  "iou": 0.45,
-  "agnostic": "Enable",
-  "max_det": 1000,
-  "multi_label": "Enable",
-  "augment": "Enable",
-  "amp": "Disable"
-}
-```
+| Flag       | Keterangan                                               |
+| ---------- | -------------------------------------------------------- |
+| `--model`  | Path ke file model (wajib)                               |
+| `--source` | Sumber input (0 untuk webcam, path file, atau direktori) |
+| `--device` | Perangkat: `cpu` atau `cuda` (default: cuda)             |
+| `--output` | Direktori output (default: outputs)                      |

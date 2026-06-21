@@ -11,8 +11,8 @@ from pkg.cfg import ConfigValues
 
 config = ConfigValues()
 
-ENABLE = "Enable"
-DISABLE = "Disable"
+ENABLE = "True"
+DISABLE = "False"
 SWITCH = [ENABLE, DISABLE]
 
 PARAMETERS = {
@@ -41,13 +41,13 @@ PARAMETERS = {
         "type": "dropdown",
         "label": "Class-Agnostic NMS",
         "items": SWITCH,
-        "value": config.get("agnostic"),
+        "value": ENABLE if config.get("agnostic") else DISABLE,
     },
     "amp": {
         "type": "dropdown",
         "label": "Automatic Mixed Precision",
         "items": SWITCH,
-        "value": config.get("amp"),
+        "value": ENABLE if config.get("amp") else DISABLE,
     },
 }
 
@@ -155,7 +155,8 @@ class SettingsLayout:
             if v["type"] == "spinbox":
                 values[k] = self.__dict__[f"{k}_form"].value()
             elif v["type"] == "dropdown":
-                values[k] = self.__dict__[f"{k}_form"].currentText()
+                text = self.__dict__[f"{k}_form"].currentText()
+                values[k] = text == ENABLE
 
         config.update(values)
         if config.save():

@@ -20,10 +20,10 @@ def load_model(path, device, **kwargs):
                        source="local", trust_repo=False, force_reload=True, **kwargs)
     m.conf = cfg.get("conf")
     m.iou = cfg.get("iou")
-    m.agnostic = cfg.get("agnostic") == "Enable"
-    m.multi_label = cfg.get("multi_label") == "Enable"
+    m.agnostic = cfg.get("agnostic")
+    m.multi_label = cfg.get("multi_label")
     m.max_det = cfg.get("max_det")
-    m.amp = cfg.get("amp") == "Enable"
+    m.amp = cfg.get("amp")
     m.to(actual_device)
 
     if kwargs.get("verbose", False):
@@ -32,7 +32,7 @@ def load_model(path, device, **kwargs):
         logging.info(f"    IoU: {m.iou}")
         logging.info(f"    Agnostic: {m.agnostic}")
         logging.info(f"    Multi-label: {m.multi_label}")
-        logging.info(f"    Augmentation: {cfg.get('augment') == 'Enable'}")
+        logging.info(f"    Augmentation: {cfg.get('augment')}")
         logging.info(f"    Max detections: {m.max_det}")
         logging.info(f"    AMP: {m.amp}")
         logging.info(f"    Device: {actual_device}")
