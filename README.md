@@ -54,3 +54,16 @@ python app.py --model weights/best.pt --device cpu
 | `--source` | Sumber input (0 untuk webcam, path file, atau direktori) |
 | `--device` | Perangkat: `cpu` atau `cuda` (default: cuda)             |
 | `--output` | Direktori output (default: outputs)                      |
+
+## Citation
+
+```bibtex
+@article{IPI4527801,
+  title = "IMPLEMENTASI METODE YOLOv5 PADA SISTEM PENDETEKSI ROKOK DI AREA BEBAS ASAP ROKOK",
+  journal = "Institut Penelitian Matematika, Komputer, Keperawatan, Pendidikan dan Ekonomi (IPM2KPE)",
+  volume = "Vol 7 No 4 (2024): INTECOMS: Journal of Information Technology and Computer Science",
+  year = "2024",
+  url = "https://journal.ipm2kpe.or.id/index.php/INTECOM/article/view/9187/7760",
+  author = "Fathoni, Aliffatul Majid; Zuliarso, Eri"
+}
+```
