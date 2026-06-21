@@ -1,0 +1,36 @@
+[project]
+name = "smokeguard"
+version = "2.0.0"
+description = "Real-time smoking activity detection application powered by YOLOv5"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+authors = [{ name = "Aliffatul Majid Fathoni" }]
+
+dependencies = [
+    "gitpython",
+    "matplotlib",
+    "numpy",
+    "opencv-contrib-python",
+    "pillow",
+    "psutil",
+    "pyyaml",
+    "pandas",
+    "seaborn",
+    "thop",
+    "torch",
+    "torchvision",
+    "tqdm",
+    "onnx",
+    "onnx-simplifier",
+    "onnxruntime",
+    "pyside6",
+    "dill",
+]
+
+[project.scripts]
+smokeguard = "app:run"
+smokeguard-cli = "control_panel:main"
+
+[project.urls]
+Homepage = "https://github.com/aliffatulmf/python-smoker"
