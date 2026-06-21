@@ -14,6 +14,8 @@ from .thread import CameraSignal, General
 
 
 class CameraThread(General, CameraSignal):
+    FRAME_SIZE = (320, 320)
+
     def __init__(self, **kwargs) -> None:
         super().__init__()
         self.kwargs = kwargs
@@ -21,12 +23,12 @@ class CameraThread(General, CameraSignal):
     def process_frame(self, frame, model, output_dir, i):
         cfg = ConfigValues()
         h_orig, w_orig = frame.shape[:2]
-        resized = cv2.resize(frame, (640, 640))
+        resized = cv2.resize(frame, self.FRAME_SIZE)
         result = model(resized, augment=cfg.get("augment") == "Enable")
         imframe = ImageFrame(frame)
 
-        scale_x = w_orig / 640
-        scale_y = h_orig / 640
+        scale_x = w_orig / self.FRAME_SIZE[0]
+        scale_y = h_orig / self.FRAME_SIZE[1]
 
         for predict in result.pandas().xyxy:
             if predict.empty:
