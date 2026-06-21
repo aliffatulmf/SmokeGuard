@@ -16,7 +16,7 @@ def load_model(path, device, **kwargs):
     cfg = ConfigValues()
 
     m = torch.hub.load("cache/yolov5", "custom", path=path,
-                       source="local", trust_repo=True, force_reload=True, **kwargs)
+                       source="local", trust_repo=False, force_reload=True, **kwargs)
     m.conf = cfg.get("conf")
     m.iou = cfg.get("iou")
     m.agnostic = cfg.get("agnostic") == "Enable"
@@ -53,21 +53,20 @@ def capture(source):
             raise ValueError("Directory is empty or contains no valid images")
         return frames
 
-    # Capture from a file source or a number-based source
+    # Capture from a single image file
+    elif os.path.isfile(source) and source.endswith(("jpg", "jpeg", "png", "webp")):
+        frame = cv2.imread(source)
+        if frame is None:
+            raise ValueError("File is not a valid image")
+        return [frame]
+
+    # Capture from a video file or webcam
     elif os.path.isfile(source) or source.isdigit():
         cap = cv2.VideoCapture(int(source) if source.isdigit() else source)
         if not cap.isOpened():
             raise ValueError("Unable to open source with VideoCapture")
         return cap
 
-    # Capture from file source
-    elif os.path.isfile(source):
-        if not source.endswith(("jpg", "jpeg", "png", "webp")):
-            raise ValueError("File is not a valid image")
-        frame = cv2.imread(source)
-        if frame is None:
-            raise ValueError("File is not a valid image")
-        return [frame]
     else:
         # Raise error for invalid source
         raise ValueError("Invalid source")

@@ -10,7 +10,7 @@ class ModelLoader:
             "custom",
             path=path,
             source="local",
-            trust_repo=True,
+            trust_repo=False,
             verbose=False,
         )
 
