@@ -28,4 +28,5 @@ class PyCacheManager:
                     shutil.rmtree(pycache_dir)
                     logging.info(f"Removed {pycache_dir}")
                 except OSError as e:
-                    raise OSError(f"Error: {e.filename} - {e.strerror}.", style="bold red")
+                    logging.error(f"Error: {e.filename} - {e.strerror}")
+                    raise
