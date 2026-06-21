@@ -7,16 +7,14 @@ from classtype.metadata import ImageMetadata
 
 
 class General(QThread):
-    stop_detection_requested = False
-
     def __init__(self):
         super().__init__()
+        self.stop_detection_requested = False
 
     def stop_thread(self):
         self.stop_detection_requested = True
 
         logging.info("Stopping thread...")
-        self.quit()
         self.wait(3000)
 
 

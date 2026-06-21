@@ -51,6 +51,8 @@ class CameraThread(General, CameraSignal):
         opt_dir = self.kwargs.get("output", "output")
         if not os.path.exists(opt_dir):
             os.makedirs(opt_dir)
+        if not os.path.exists(f"{opt_dir}/images"):
+            os.makedirs(f"{opt_dir}/images")
             
         cap = capture(self.kwargs["source"])
 
