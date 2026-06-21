@@ -20,8 +20,13 @@ class CameraThread(General, CameraSignal):
             
     def process_frame(self, frame, model, output_dir, i):
         cfg = ConfigValues()
-        result = model(frame, augment=cfg.get("augment") == "Enable", size=1280)
+        h_orig, w_orig = frame.shape[:2]
+        resized = cv2.resize(frame, (640, 640))
+        result = model(resized, augment=cfg.get("augment") == "Enable")
         imframe = ImageFrame(frame)
+
+        scale_x = w_orig / 640
+        scale_y = h_orig / 640
 
         for predict in result.pandas().xyxy:
             if predict.empty:
@@ -29,10 +34,10 @@ class CameraThread(General, CameraSignal):
 
             for data in predict.to_numpy():
                 xmin, ymin, xmax, ymax, conf, _, obj = data
-                xmin = int(xmin)
-                ymin = int(ymin)
-                xmax = int(xmax)
-                ymax = int(ymax)
+                xmin = int(xmin * scale_x)
+                ymin = int(ymin * scale_y)
+                xmax = int(xmax * scale_x)
+                ymax = int(ymax * scale_y)
                 obj = "rokok" if obj == "smoking" else obj
 
                 draw(frame, xmin, ymin, xmax, ymax, obj, round(conf, 2))
@@ -56,8 +61,14 @@ class CameraThread(General, CameraSignal):
             
         cap = capture(self.kwargs["source"])
 
+        model_path = self.kwargs.get("model")
+        if not model_path:
+            logging.critical("Model path not specified")
+            self.send("EndOfDetection", True)
+            return
+
         try:
-            model = load_model(self.kwargs["model"], device=self.kwargs["device"], verbose=True)
+            model = load_model(model_path, device=self.kwargs["device"], verbose=True)
         except Exception as e:
             logging.critical(e)
             self.send("EndOfDetection", True)

@@ -43,6 +43,7 @@ class Window(QMainWindow):
         self.snapshot_window = SnapshotWindow()
         self.camera_thread = CameraThread(**kwargs)
         self.camera_layout = CameraLayout(self, self.camera_thread, **kwargs)
+        self.camera_layout.show()
 
         # Menu bar
         menu_layout: QMenuBar = QMenuBar(self)

@@ -14,10 +14,10 @@ ThreadInactiveError = InactiveThreadError("Thread is not running")
 
 
 class CameraLayout(QWidget):
-    X = 250
-    Y = 40
-    WIDTH = 640
-    HEIGHT = 640
+    X = 260
+    Y = 45
+    WIDTH = 650
+    HEIGHT = 580
 
     def __init__(self, parent: QWidget, camera_thread: CameraThread, **kwargs):
         super().__init__(parent)
@@ -66,4 +66,10 @@ class CameraLayout(QWidget):
     @Slot(QImage)
     def slot_image(self, image: QImage):
         pixmap = QPixmap.fromImage(image)
-        self.video.setPixmap(pixmap)
+        scaled = pixmap.scaled(
+            self.WIDTH - 40,
+            self.HEIGHT - 60,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.video.setPixmap(scaled)
