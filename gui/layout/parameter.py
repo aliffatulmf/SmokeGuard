@@ -107,7 +107,7 @@ class SettingsLayout:
                 self.__dict__[f"{k}_form"].setValue(v["value"])
             elif v["type"] == "dropdown":
                 self.__dict__[f"{k}_form"].setCurrentText(
-                    ENABLE if v["value"] else DISABLE)
+                    ENABLE if v["value"] == ENABLE else DISABLE)
             elif v["type"] == "choice":
                 self.__dict__[f"{k}_form"].setCurrentText(v["value"])
 

@@ -44,7 +44,7 @@ class ConfigValues:
 
         for key, value in config.items():
             if isinstance(value, int):
-                if 0 <= value >= 100:
+                if not (0 <= value <= 100):
                     raise ValueError(f"Value of {key} must be between 0 and 100")
                 
                 config[key] = value/100 if key in ["conf", "iou"] else value
