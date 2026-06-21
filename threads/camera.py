@@ -14,7 +14,7 @@ from .thread import CameraSignal, General
 
 
 class CameraThread(General, CameraSignal):
-    FRAME_SIZE = (320, 320)
+    FRAME_SIZE = (640, 640)
 
     def __init__(self, **kwargs) -> None:
         super().__init__()
